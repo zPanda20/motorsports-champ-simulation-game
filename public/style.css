@@ -1,0 +1,69 @@
+/* 1919 look: De Stijl blocks and rules sliding toward Bauhaus type. A moderate take. */
+:root {
+  --paper: #f1ead8;
+  --paper2: #e8dfc8;
+  --ink: #16140f;
+  --red: #c42a1c;
+  --yellow: #f0bf2a;
+  --blue: #1e3f8f;
+  --grey: #6b665a;
+  --rule: 3px solid var(--ink);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--paper); color: var(--ink);
+  font-family: Futura, "Century Gothic", "Trebuchet MS", "Segoe UI", Arial, sans-serif;
+  font-size: 15px; line-height: 1.4;
+}
+header.top {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px;
+  padding: 12px 20px; border-bottom: var(--rule); background: var(--paper);
+}
+.brand { display: flex; align-items: center; gap: 6px; }
+.brand h1 { margin: 0 0 0 10px; font-size: 22px; letter-spacing: .18em; text-transform: uppercase; font-weight: 800; }
+.block { display: inline-block; width: 18px; height: 34px; border: 2px solid var(--ink); }
+.b-red { background: var(--red); } .b-yellow { background: var(--yellow); } .b-blue { background: var(--blue); width: 34px; }
+.status { flex: 1; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; min-width: 180px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+button, select, input {
+  font: inherit; color: var(--ink); background: var(--paper); border: 2px solid var(--ink); padding: 6px 12px; border-radius: 0;
+}
+button { cursor: pointer; font-weight: 700; letter-spacing: .03em; }
+button:hover:not(:disabled) { background: var(--yellow); }
+button.primary { background: var(--red); color: #fff; }
+button.primary:hover:not(:disabled) { background: var(--ink); }
+button:disabled { opacity: .4; cursor: not-allowed; }
+main { max-width: 1280px; margin: 0 auto; padding: 18px 20px 40px; }
+.panel { background: #fbf6e8; border: var(--rule); padding: 14px 16px; margin-bottom: 16px; position: relative; }
+.panel::before { content: ""; position: absolute; left: -3px; top: -3px; width: 34px; height: 10px; background: var(--red); border: 2px solid var(--ink); }
+h2, h3 { margin: 0 0 8px; text-transform: uppercase; letter-spacing: .12em; }
+h2 { font-size: 20px; } h3 { font-size: 15px; }
+.small { color: var(--grey); font-size: 13px; }
+.row, .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+.sep { width: 14px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 0; margin-bottom: 16px; border: var(--rule); width: fit-content; }
+.tabs button { border: 0; border-right: 2px solid var(--ink); }
+.tabs button:last-child { border-right: 0; }
+.tabs button.on { background: var(--blue); color: #fff; }
+.two { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }
+.three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+@media (max-width: 900px) { .two, .three { grid-template-columns: 1fr; } }
+table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+th, td { padding: 4px 8px; text-align: left; border-bottom: 1px solid #cfc6ad; white-space: nowrap; }
+th { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; border-bottom: 2px solid var(--ink); }
+td.num, th.num { text-align: right; }
+tr.out td { color: var(--grey); text-decoration: line-through; text-decoration-color: #b8ae92; }
+tr.click { cursor: pointer; } tr.click:hover td { background: var(--paper2); }
+.feed { margin: 0; padding: 0; list-style: none; max-height: 420px; overflow: auto; font-size: 14px; }
+.feed li { padding: 3px 0; border-bottom: 1px dotted #cfc6ad; }
+.feed li.out { color: var(--red); font-weight: 700; }
+.feed li.hd { background: var(--yellow); font-weight: 800; padding: 3px 6px; letter-spacing: .06em; text-transform: uppercase; }
+.tag { display: inline-block; padding: 0 6px; border: 2px solid var(--ink); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; margin-left: 4px; }
+.tag.legend { background: var(--yellow); }
+.tag.part { background: var(--paper2); }
+.bar { display: inline-block; height: 10px; background: var(--blue); vertical-align: middle; }
+.bars td { padding: 2px 8px; }
+details { margin: 6px 0; } summary { cursor: pointer; font-weight: 700; }
+pre.recap { white-space: pre-wrap; font-family: ui-monospace, Consolas, monospace; font-size: 12.5px; margin: 6px 0 0; }
+footer { text-align: center; padding: 18px; border-top: var(--rule); }

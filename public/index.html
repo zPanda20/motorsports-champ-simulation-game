@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Series Chronicle</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="era-1919">
+<header class="top">
+  <div class="brand">
+    <span class="block b-red"></span><span class="block b-yellow"></span><span class="block b-blue"></span>
+    <h1>Series Chronicle</h1>
+  </div>
+  <div class="status" id="status">No series yet</div>
+  <nav class="actions">
+    <button id="btn-new">New series</button>
+    <button id="btn-save" disabled>Save to file</button>
+    <button id="btn-load">Load file</button>
+    <input type="file" id="file-load" accept=".json,.msc,application/json" hidden>
+    <button id="btn-device" title="Name this computer so saves can tell where they were last opened">This computer</button>
+  </nav>
+</header>
+
+<main>
+  <section id="welcome" class="panel">
+    <h2>Run a championship from 1919</h2>
+    <p>One series, one seed, a hundred years. Start a new series, then watch each race lap by lap, or let the seasons run themselves. Every race is a pure function of the seed, so the result is the same however fast you watch.</p>
+    <div class="row">
+      <label>Seed <input id="seed" value="" placeholder="any word or number"></label>
+      <button id="btn-start" class="primary">Start 1919</button>
+    </div>
+    <p class="small">Saves are single files. Use <b>Save to file</b> to move a series between computers. The page also keeps an automatic copy in this browser.</p>
+    <div id="resume" class="small"></div>
+  </section>
+
+  <section id="game" hidden>
+    <div class="tabs" id="tabs">
+      <button data-tab="race" class="on">Race</button>
+      <button data-tab="standings">Standings</button>
+      <button data-tab="entries">Entries</button>
+      <button data-tab="results">Results</button>
+      <button data-tab="chronicle">Chronicle</button>
+    </div>
+
+    <div id="tab-race" class="tabpane">
+      <div class="panel">
+        <h2 id="race-title">Next race</h2>
+        <div id="race-sub" class="small"></div>
+        <div class="controls">
+          <button id="btn-watch1" class="primary">Watch (lap by lap)</button>
+          <button id="btn-watch2">Watch faster</button>
+          <button id="btn-watch3">Events only</button>
+          <button id="btn-skip">Run race instantly</button>
+          <button id="btn-pause" disabled>Pause</button>
+          <span class="sep"></span>
+          <button id="btn-season">Run rest of season</button>
+          <button id="btn-next-year" hidden>Start next season</button>
+          <select id="years-n"><option value="1">1 season</option><option value="5">5 seasons</option><option value="10">10 seasons</option><option value="25">25 seasons</option></select>
+          <button id="btn-auto">Autopilot</button>
+        </div>
+      </div>
+      <div class="two">
+        <div class="panel"><h3>Timing <span id="lapcount" class="small"></span></h3><table id="timing"></table></div>
+        <div class="panel"><h3>Race feed</h3><ol id="feed" class="feed"></ol></div>
+      </div>
+      <div class="panel" id="last-race" hidden><h3 id="last-title"></h3><table id="classification"></table><div id="last-retire" class="small"></div></div>
+    </div>
+
+    <div id="tab-standings" class="tabpane" hidden>
+      <div class="three">
+        <div class="panel"><h3>Drivers</h3><table id="st-drivers"></table></div>
+        <div class="panel"><h3>Entries</h3><table id="st-entries"></table></div>
+        <div class="panel"><h3>Makers</h3><table id="st-brands"></table></div>
+      </div>
+    </div>
+
+    <div id="tab-entries" class="tabpane" hidden>
+      <div class="panel"><h3>Entry list</h3><table id="entry-table"></table></div>
+      <div class="panel" id="driver-card" hidden></div>
+    </div>
+
+    <div id="tab-results" class="tabpane" hidden>
+      <div class="panel"><h3>Season calendar</h3><table id="cal-table"></table></div>
+      <div class="panel"><h3>Race reports</h3><div id="reports"></div></div>
+    </div>
+
+    <div id="tab-chronicle" class="tabpane" hidden>
+      <div class="panel"><h3>Champions</h3><table id="champions"></table></div>
+      <div class="panel"><h3>Coming through (talent unknown until they are of age)</h3><table id="cohort"></table></div>
+      <div class="panel"><h3>Regulations in force</h3><div id="regs" class="small"></div></div>
+    </div>
+  </section>
+</main>
+<footer class="small">Deterministic engine: the same seed and the same choices always give the same history, on any computer.</footer>
+<script type="module" src="app.js"></script>
+</body>
+</html>

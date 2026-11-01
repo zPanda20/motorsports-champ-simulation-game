@@ -1,0 +1,15 @@
+{
+  "name": "motorsports-champ-simulation-game",
+  "version": "0.1.0",
+  "description": "Single-player, offline motorsport series CEO simulation, 1919 onward. Deterministic seeded engine, static site.",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "test": "node tests/run.js",
+    "balance": "node tests/balance.js",
+    "balance:quick": "node tests/balance.js 60",
+    "serve": "node scripts/serve.js",
+    "recap": "node scripts/recap.js"
+  }
+}
