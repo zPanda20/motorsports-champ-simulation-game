@@ -85,6 +85,7 @@ export const BRANDS = [
   B('plymouth', 'Plymouth', 'US', 1928, ['#274e9a', '#e6e6e6'], { perf: [[1964, 'Mopar Plymouth']] }),
   B('buick', 'Buick', 'US', 1903, ['#8c1d2b', '#b7bcc4']),
   B('cadillac', 'Cadillac', 'US', 1902, ['#13213d', '#b08d57']),
+  B('pontiac', 'Pontiac', 'US', 1926, ['#c1121f', '#d9a21b']),
   B('kia', 'Kia', 'KR', 1944, ['#bb162b', '#e8e8e8']),
   B('alpine', 'Alpine', 'FR', 1955, ['#0b4fb8', '#ec6ca8']),
   // engine builders that never run a works team

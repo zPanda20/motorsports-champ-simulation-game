@@ -24,7 +24,7 @@ export const GROUPS = [
   { id: 'mopar', names: [[1925, 'Mopar']], members: [M('chrysler', 1925, 1997), M('dodge', 1928, 1997), M('plymouth', 1928, 2001), M('chrysler', 2008, 2013), M('dodge', 2008, 2013)] },
   { id: 'daimlerchrysler', names: [[1998, 'DaimlerChrysler']], members: [M('mercedes', 1998, 2007), M('chrysler', 1998, 2007), M('dodge', 1998, 2007)] },
   { id: 'psa', names: [[1976, 'PSA Peugeot Citroën']], members: [M('peugeot', 1976, 2020), M('citroen', 1976, 2020), M('opel', 2017, 2020), M('vauxhall', 2017, 2020)] },
-  { id: 'gm', names: [[1908, 'General Motors']], members: [M('buick', 1908), M('cadillac', 1909), M('chevrolet', 1918), M('vauxhall', 1925, 2016), M('opel', 1929, 2016)] },
+  { id: 'gm', names: [[1908, 'General Motors']], members: [M('buick', 1908), M('cadillac', 1909), M('chevrolet', 1918), M('pontiac', 1926), M('vauxhall', 1925, 2016), M('opel', 1929, 2016)] },
   { id: 'ford', names: [[1903, 'Ford Motor Company']], members: [M('ford', 1903), M('astonmartin', 1987, 2006), M('jaguar', 1989, 2007), M('volvo', 1999, 2009), M('mazda', 1979, 2008)] },
   { id: 'bl', names: [[1952, 'British Motor Corporation'], [1968, 'British Leyland']], members: [M('austin', 1952, 1993), M('jaguar', 1966, 1988)] },
   { id: 'tata', names: [[2008, 'Tata Motors']], members: [M('jaguar', 2008)] },

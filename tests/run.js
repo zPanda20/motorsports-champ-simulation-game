@@ -19,7 +19,9 @@ import { OILS, OIL_FROM, SUPPLIER_SPONSOR_IDS } from '../public/engine/data/oils
 import { worksTargetFor } from '../public/engine/data/curve.js';
 import { GROUPS, groupName, groupOfBrand, MERGERS } from '../public/engine/data/corp.js';
 import { activeProgrammes } from '../public/engine/corp.js';
-import { brandPalette, teamPalette, inkOn, contrast } from '../public/ui/colors.js';
+import { brandPalette, teamPalette, inkOn, contrast, brandMark as colorsBrandMark } from '../public/ui/colors.js';
+import { logoFile, logoFor, LOGO_BRANDS, LOGO_FILES } from '../public/ui/assets.js';
+import { readdirSync, existsSync } from 'node:fs';
 import * as pages from '../public/ui/pages.js';
 
 let passed = 0, failed = 0;
@@ -674,6 +676,43 @@ test('slice 4: pages show team colours, makers\' badges and the seasons a driver
   assert(/year by year/i.test(html) && /#\/standings\/\d{4}/.test(html), 'driver page lacks the year-by-year teams');
   const chron = pages.pageChronicle(w, w.year - 1);
   assert(/#\/standings\/\d{4}/.test(chron), 'chronicle does not link to the points tables');
+});
+
+test('logos: every maker with a badge shows one in every year, and every badge file is used', () => {
+  assert(LOGO_BRANDS.length >= 25, 'few makers with badges: ' + LOGO_BRANDS.length);
+  for (const id of LOGO_BRANDS) {
+    assert(BRAND_DEF[id], id + ' has a badge but is not a maker in the game');
+    for (let y = 1880; y <= 2100; y++) assert(logoFile(id, y), `${id} has no badge in ${y}`);
+    assert(logoFor(id, undefined) && logoFor(id), id + ' has no badge when no year is given');
+  }
+  const dir = new URL('../public/assets/logos/', import.meta.url);
+  for (const f of LOGO_FILES) assert(existsSync(new URL(encodeURI(f), dir)), 'missing file ' + f);
+  const onDisk = readdirSync(dir).filter((f) => /\.(png|webp|svg|jpe?g)$/i.test(f));
+  const unused = onDisk.filter((f) => LOGO_FILES.indexOf(f) < 0);
+  eq(unused.length, 0, 'logo files no maker uses: ' + unused.join(', '));
+  assert(!logoFile('mercedes', 1950), 'a maker without a badge must stay without one');
+});
+test('logos: a design is used in its own years and the nearest one outside them', () => {
+  eq(logoFile('chevrolet', 1920), 'Chevrolet(1913-1931).png');
+  eq(logoFile('chevrolet', 1932), 'Chevrolet(1913-1931).png', 'the gap year after the first design');
+  eq(logoFile('chevrolet', 1933), 'chevy(1934-1950).png', 'the gap year before the second design');
+  eq(logoFile('chevrolet', 1990), 'Chevy(1978-2000).webp');
+  eq(logoFile('chevrolet', 2025), 'Chevrolet(2000-).png');
+  eq(logoFile('kia', 2005), 'KIA(1994-2020).svg'); eq(logoFile('kia', 2030), 'KIA_modern.webp'); eq(logoFile('kia', 1950), 'KIA(!944-1964).webp');
+  eq(logoFile('lotus', 1986), 'Lotus(1948-1984).png'); eq(logoFile('lotus', 2020), 'Lotus(1989-2010).webp');
+  eq(logoFile('jaguar', 1930), 'Jaguar(2012-2022).png', 'before the first design');
+  eq(logoFile('audi', 1920), logoFile('autounion', 1990), 'Audi and Auto Union share the four rings');
+  eq(logoFile('peugeot', 1990), 'peugeot.png', 'the 1920s design stays until a newer one exists');
+  assert(/^assets\/logos\//.test(logoFor('dodge', 2030)));
+});
+test('logos: the badge shows beside a maker and on a works team, in any year', () => {
+  const w = LONG.w;
+  for (const b of w.brands.filter((x) => LOGO_BRANDS.indexOf(x.id) >= 0)) {
+    for (const y of [1925, 1975, 2024]) assert(/<img class="mk-icon"/.test(colorsBrandMark(w, b.id, y)), b.id + ' ' + y);
+    assert(/<img class="mk-hero"/.test(pages.pageBrand(w, b.id)), b.id + ' page has no large badge');
+  }
+  assert(w.brands.some((b) => b.id === 'pontiac'), 'Pontiac should be a maker (it has a badge)');
+  assert(!/mono/.test(colorsBrandMark(w, 'chevrolet', 1911)), 'Chevrolet before its first badge year still shows a badge');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
