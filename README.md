@@ -89,6 +89,12 @@ Download the repo ZIP again (or `git pull`) and replace the folder. Saves from e
 - **Race viewer.** Three speeds, plus *follow a driver* (event mode prioritises that car). What timing shows depends on the era: rounded gaps early, no stop or tyre columns until they existed.
 - **Stability dial.** Teams and makers come and go freely early and settle later.
 
+## Artwork
+
+- `public/assets/bg/1920s.jpg` to `1950s.jpg`: decade backgrounds, shown behind the page while the game year is 1920-1959. The "Era backgrounds" selector in the header turns them off (remembered per browser).
+- `public/assets/logos/<maker>.png`: badges for Ballot, Duesenberg, Sunbeam, Isotta Fraschini, Darracq, Stutz, Peugeot and Opel. They show as small icons beside every maker name, and large on the maker page and on a works team's page. The Peugeot and Opel badges are 1920s designs and stop showing after 1929.
+- `public/ui/assets.js` is the only place that maps years and makers to pictures; add a decade or a maker there and drop the file in the folder.
+
 ## Coverage of the design document
 
 Built and visible in play:

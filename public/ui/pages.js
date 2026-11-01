@@ -18,10 +18,11 @@ import { entryStandings, driverStandings, brandStandings } from '../engine/seaso
 import { titleTables, recordBook, trackHistory, driverSeasons, driverTeams, teamDriverTenure, rivalries } from '../engine/records.js';
 import { formatTime, raceRecap } from '../engine/recap.js';
 import { esc, link, table, bar, kv, panel, small, tag, pct, ordinal, band } from './common.js';
+import { logoIcon, logoHero } from './assets.js';
 
 const dn = (w, id) => { const d = driverById(w, id); return d ? link('driver', d.id, d.name) : '?'; };
 const tn = (w, id) => { const t = teamById(w, id); return t ? link('team', t.id, t.name) : '?'; };
-const bn = (w, id) => { const b = brandById(w, id); return b ? link('brand', b.id, b.name) : esc(id === 'none' ? '-' : id); };
+const bn = (w, id) => { const b = brandById(w, id); return b ? logoIcon(b.id, w.year) + link('brand', b.id, b.name) : esc(id === 'none' ? '-' : id); };
 const trn = (id) => { const t = TRACK_BY_ID[id]; return t ? link('track', id, t.name) : esc(id); };
 const sn = (w, id) => { const s = seriesById(w, id); return s ? link('series', s.id, s.name) : '?'; };
 const ltn = (w, id) => { const t = lowTeamById(w, id); return t ? link('lowteam', t.id, t.name) : '?'; };
@@ -122,7 +123,7 @@ export function pageTeam(w, id) {
   const base = moneyScale(w.year);
   const status = t.active ? (t.scope === 'global' ? 'Racing' : 'Racing (local)') : `Left the grid in ${t.endedYear || '?'}${t.closed ? ': ' + esc(t.closed.why) : ''}`;
 
-  const head = `<div class="hero"><h2>${esc(t.name)}</h2><div class="small">${esc(status)} · ${esc(t.nat)} · founded ${t.foundedYear} · ${t.kind === 'works' ? `works team of ${bn(w, t.brandId)}` : `privateer, ${bn(w, t.brandId)} customer`} · ${esc((REGION_BY_ID[t.region] || {}).name || t.region || '')}` +
+  const head = `<div class="hero">${t.kind === 'works' ? logoHero(t.brandId, w.year, brandText(w, t.brandId)) : ''}<h2>${esc(t.name)}</h2><div class="small">${esc(status)} · ${esc(t.nat)} · founded ${t.foundedYear} · ${t.kind === 'works' ? `works team of ${bn(w, t.brandId)}` : `privateer, ${bn(w, t.brandId)} customer`} · ${esc((REGION_BY_ID[t.region] || {}).name || t.region || '')}` +
     (t.names && t.names.length > 1 ? ` · formerly ${esc(t.names.filter((n) => n !== t.name).join(', '))}` : '') + '</div>' +
     ((t.legacy && t.legacy.legendary) ? tag('legendary team') : '') + (t.groupId ? tag('part of a group') : '') + '</div>';
 
@@ -279,7 +280,7 @@ export function pageBrand(w, id) {
   const titles = w.history.seasons.filter((h) => h.championBrand && h.championBrand.id === b.id).map((h) => h.year);
   const dtitles = w.history.seasons.filter((h) => h.champion && h.championBrand && h.championBrand.id === b.id).map((h) => h.year);
   const techs = Object.keys(b.tech || {}).filter((k) => b.tech[k]).map((k) => TECHS.find((x) => x.id === k)).filter(Boolean);
-  const head = `<div class="hero"><h2>${esc(b.name)}</h2><div class="small">${esc(b.country)} · founded ${b.founded} · ${esc(b.status === 'racing' ? 'racing with a works team' : b.status)} · ${b.raceYears || 0} years in the current stint</div></div>`;
+  const head = `<div class="hero">${logoHero(b.id, w.year, b.name)}<h2>${esc(b.name)}</h2><div class="small">${esc(b.country)} · founded ${b.founded} · ${esc(b.status === 'racing' ? 'racing with a works team' : b.status)} · ${b.raceYears || 0} years in the current stint</div></div>`;
   const strengths = panel('Strengths', table(['', { t: '', num: 1 }, ''], [['Overall', Math.round(b.strength * 100), bar(b.strength * 100)], ['Chassis', Math.round(b.chassisStrength * 100), bar(b.chassisStrength * 100)], ['Engine', Math.round(b.engineStrength * 100), bar(b.engineStrength * 100)], ['Reliability', Math.round(b.reliability * 100), bar(b.reliability * 100)]]) +
     small(`Commitment to racing ${b.commitment === undefined ? '' : b.commitment.toFixed(2)} (how much money the board puts in). Risk appetite ${b.risk === undefined ? '' : pct(b.risk)}. Sells to customers: ${b.sellsCustomers ? 'yes' : 'no'}.`));
   const sum = panel('Record', kv([['Maker\'s titles', b.titles + (titles.length ? ' (' + titles.slice(-12).join(', ') + (titles.length > 12 ? ' …' : '') + ')' : '')], ['Race wins', b.wins], ['Fans', b.fans], ['Health of the company', pct(b.health === undefined ? b.strength : b.health)]]));

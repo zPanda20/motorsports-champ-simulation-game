@@ -12,6 +12,7 @@ import { formatTime, formatGap } from './engine/recap.js';
 import { pendingItems, resolveItem, settleAll, inviteBrand, expelBrand, setRegulation, setTechRule } from './engine/governor.js';
 import * as pages from './ui/pages.js';
 import { esc, table } from './ui/common.js';
+import { backgroundFor } from './ui/assets.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -62,6 +63,8 @@ function applyTheme() {
   const pref = store.get('msc.theme') || 'auto';
   const id = pref === 'auto' ? themeForYear(world ? world.year : 1919) : pref;
   document.body.dataset.theme = id;
+  const bg = (store.get('msc.bg') || 'on') === 'on' && world ? backgroundFor(world.year) : null;
+  if (bg) document.body.dataset.bg = bg; else delete document.body.dataset.bg;
 }
 
 function initThemePicker() {
@@ -69,6 +72,9 @@ function initThemePicker() {
   sel.innerHTML = '<option value="auto">Interface follows the era</option>' + THEMES.map((t) => `<option value="${t.id}">Fixed: ${esc(t.label)}</option>`).join('');
   sel.value = store.get('msc.theme') || 'auto';
   sel.onchange = () => { store.set('msc.theme', sel.value); applyTheme(); };
+  const bsel = $('bg-sel');
+  bsel.value = store.get('msc.bg') || 'on';
+  bsel.onchange = () => { store.set('msc.bg', bsel.value); applyTheme(); };
 }
 
 // ---------------------------------------------------------------- automatic copy (IndexedDB, falling back to localStorage)
