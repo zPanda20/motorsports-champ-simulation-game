@@ -70,19 +70,20 @@ export function legendRoster() {
   const rng = makeRng(LEGEND_SEED, 'roster');
   const used = new Set();
   const list = [];
-  for (let by = PARAMS.world.birthStart; by <= 2008; by++) {
+  for (let by = PARAMS.world.birthStart; by <= 2045; by++) {
     let n = 0;
     if (rng.chance(0.5)) n++;
     if (rng.chance(0.18)) n++;
     for (let i = 0; i < n; i++) {
       const natW = nationalityWeights(by + 24);
       const nat = rng.weighted(natW, (x) => x.w).n;
-      const nm = makePersonName(rng, nat, used);
+      const gender = list.length % 2 === 0 ? 'M' : 'F';
+      const nm = makePersonName(rng, nat, used, gender);
       const bias = {};
       for (const k of STAT_KEYS) bias[k] = rng.gauss(0, 7);
       list.push({
         legendId: 'L' + String(list.length + 1).padStart(3, '0'),
-        ...nm, nat, birthYear: by,
+        ...nm, nat, gender, birthYear: by,
         baseTalent: clamp(rng.gauss(80, 5), 68, 95),
         bias,
         style: clamp(rng.gauss(0, 0.6), -1, 1),
@@ -101,19 +102,19 @@ export function makeDriverFromLegend(rng, id, leg) {
   const peak = {};
   for (const k of STAT_KEYS) peak[k] = clamp(Math.round((leg.baseTalent + leg.bias[k]) * roll), 20, 99);
   return {
-    id, name: leg.full, first: leg.first, last: leg.last, nat: leg.nat, birthYear: leg.birthYear,
+    id, name: leg.full, first: leg.first, last: leg.last, nat: leg.nat, gender: leg.gender, birthYear: leg.birthYear,
     peak, peakAge: leg.peakAge, style: Math.round(leg.style * 100) / 100,
     legend: leg.legendId, status: 'active', tier: null, retiredYear: null, wins: 0, titles: 0, starts: 0,
   };
 }
 
-export function makeDriver(rng, id, nat, birthYear, used) {
-  const nm = makePersonName(rng, nat, used);
+export function makeDriver(rng, id, nat, birthYear, used, gender = 'M') {
+  const nm = makePersonName(rng, nat, used, gender);
   const talent = clamp(rng.gauss(50, 11), 20, 82);
   const peak = {};
   for (const k of STAT_KEYS) peak[k] = clamp(Math.round(talent + rng.gauss(0, 9)), 10, 97);
   return {
-    id, name: nm.full, first: nm.first, last: nm.last, nat, birthYear,
+    id, name: nm.full, first: nm.first, last: nm.last, nat, gender, birthYear,
     peak, peakAge: rng.int(25, 31), style: Math.round(clamp(rng.gauss(0, 0.55), -1, 1) * 100) / 100,
     legend: null, status: 'active', tier: null, retiredYear: null, wins: 0, titles: 0, starts: 0,
   };

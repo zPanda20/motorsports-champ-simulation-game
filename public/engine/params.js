@@ -98,4 +98,14 @@ export const PARAMS = {
   dev: { perRound: 0.35, cap: 14 }, // in-season development, index points per round at tech 100
 
   season: { partialShare: 0.5 },
+
+  // ---- the industry between seasons ----
+  industry: {
+    mean: 0.55,              // brand strength drifts back towards this
+    revert: 0.22,            // share of the gap closed each year
+    noise: 0.055,
+    breakthrough: 0.035,
+    crisis: 0.035,
+    contractExpiry: 0.35,    // yearly chance a driver's contract is up
+  },
 };

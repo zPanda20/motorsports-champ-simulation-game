@@ -1,6 +1,6 @@
 // Real manufacturer names. A brand cannot appear before `founded` (real life), but
 // may survive past its real-life death: strength and survival are rolled per save.
-// `maxStrength` is deliberately generic: quality does NOT follow the real brand.
+// Quality does NOT follow the real brand. Founding years are approximate.
 
 export const BRANDS = [
   { id: 'lozier', name: 'Lozier', country: 'US', founded: 1900 },
@@ -19,4 +19,41 @@ export const BRANDS = [
   { id: 'bugatti', name: 'Bugatti', country: 'FR', founded: 1909 },
   { id: 'mercedes', name: 'Mercedes', country: 'DE', founded: 1902 },
   { id: 'opel', name: 'Opel', country: 'DE', founded: 1899 },
+  // already trading in 1919, added to the pool
+  { id: 'alfa', name: 'Alfa Romeo', country: 'IT', founded: 1910 },
+  { id: 'maserati', name: 'Maserati', country: 'IT', founded: 1914 },
+  { id: 'astonmartin', name: 'Aston Martin', country: 'GB', founded: 1913 },
+  { id: 'bmw', name: 'BMW', country: 'DE', founded: 1916 },
+  { id: 'audi', name: 'Audi', country: 'DE', founded: 1909 },
+  { id: 'ford', name: 'Ford', country: 'US', founded: 1903 },
+  { id: 'chevrolet', name: 'Chevrolet', country: 'US', founded: 1911 },
+  { id: 'renault', name: 'Renault', country: 'FR', founded: 1899 },
+  { id: 'lancia', name: 'Lancia', country: 'IT', founded: 1906 },
+  { id: 'austin', name: 'Austin', country: 'GB', founded: 1905 },
+  { id: 'bentley', name: 'Bentley', country: 'GB', founded: 1919 },
+  // arriving later
+  { id: 'mazda', name: 'Mazda', country: 'JP', founded: 1920 },
+  { id: 'jaguar', name: 'Jaguar', country: 'GB', founded: 1922 },
+  { id: 'volvo', name: 'Volvo', country: 'SE', founded: 1927 },
+  { id: 'porsche', name: 'Porsche', country: 'DE', founded: 1931 },
+  { id: 'autounion', name: 'Auto Union', country: 'DE', founded: 1932 },
+  { id: 'nissan', name: 'Nissan', country: 'JP', founded: 1933 },
+  { id: 'toyota', name: 'Toyota', country: 'JP', founded: 1937 },
+  { id: 'ferrari', name: 'Ferrari', country: 'IT', founded: 1939 },
+  { id: 'brm', name: 'BRM', country: 'GB', founded: 1945 },
+  { id: 'matra', name: 'Matra', country: 'FR', founded: 1945 },
+  { id: 'cooper', name: 'Cooper', country: 'GB', founded: 1947 },
+  { id: 'honda', name: 'Honda', country: 'JP', founded: 1948 },
+  { id: 'vanwall', name: 'Vanwall', country: 'GB', founded: 1949 },
+  { id: 'lotus', name: 'Lotus', country: 'GB', founded: 1952 },
+  { id: 'subaru', name: 'Subaru', country: 'JP', founded: 1953 },
+  { id: 'brabham', name: 'Brabham', country: 'AU', founded: 1960 },
+  { id: 'mclaren', name: 'McLaren', country: 'GB', founded: 1963 },
+  { id: 'lamborghini', name: 'Lamborghini', country: 'IT', founded: 1963 },
+  { id: 'hyundai', name: 'Hyundai', country: 'KR', founded: 1967 },
+  { id: 'ligier', name: 'Ligier', country: 'FR', founded: 1969 },
+  { id: 'lexus', name: 'Lexus', country: 'JP', founded: 1989 },
+  { id: 'tesla', name: 'Tesla', country: 'US', founded: 2003 },
+  { id: 'genesis', name: 'Genesis', country: 'KR', founded: 2015 },
+  { id: 'polestar', name: 'Polestar', country: 'SE', founded: 2017 },
 ];

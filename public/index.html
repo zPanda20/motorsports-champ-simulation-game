@@ -6,7 +6,7 @@
 <title>Series Chronicle</title>
 <link rel="stylesheet" href="style.css">
 </head>
-<body class="era-1919">
+<body data-theme="destijl">
 <header class="top">
   <div class="brand">
     <span class="block b-red"></span><span class="block b-yellow"></span><span class="block b-blue"></span>
@@ -19,6 +19,7 @@
     <button id="btn-load">Load file</button>
     <input type="file" id="file-load" accept=".json,.msc,application/json" hidden>
     <button id="btn-device" title="Name this computer so saves can tell where they were last opened">This computer</button>
+    <select id="theme-sel" class="theme-sel" title="Interface style"></select>
   </nav>
 </header>
 
@@ -86,7 +87,11 @@
     </div>
 
     <div id="tab-chronicle" class="tabpane" hidden>
-      <div class="panel"><h3>Champions</h3><table id="champions"></table></div>
+      <div class="chron">
+        <aside class="panel"><h3>Seasons</h3><ul id="season-list" class="slist"></ul></aside>
+        <section class="panel" id="season-detail"></section>
+      </div>
+      <div class="panel"><h3>The industry today</h3><table id="industry"></table></div>
       <div class="panel"><h3>Coming through (talent unknown until they are of age)</h3><table id="cohort"></table></div>
       <div class="panel"><h3>Regulations in force</h3><div id="regs" class="small"></div></div>
     </div>

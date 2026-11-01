@@ -7,7 +7,7 @@
 import { makeRng, clamp, round1 } from './rng.js';
 import { PARAMS as P } from './params.js';
 import { COMPONENTS, TYRE_FAILURES } from './data/components.js';
-import { eraSpeedFactor, eraReliabilityFactor } from './data/eras.js';
+import { eraSpeedFactor, eraReliabilityFactor, eraPitFactor, eraRepairFactor } from './data/eras.js';
 
 export function lapsFor(track, regs) {
   const n = Math.round(regs.raceKm / track.lengthKm);
@@ -100,7 +100,8 @@ export function* raceGenerator(setup) {
   const len = T.lengthKm;
   const totalKm = laps * len;
   const baseLap = baseLapSeconds(T, year);
-  const relEra = eraReliabilityFactor(year, P.rel.eraGainPerYear);
+  const relEra = eraReliabilityFactor(year);
+  const pitF = eraPitFactor(year), repF = eraRepairFactor(year);
 
   // weather: optional rain spell, decided up front so every speed agrees
   const rain = { start: 0, end: 0, level: 0 };
@@ -189,12 +190,12 @@ export function* raceGenerator(setup) {
               c.limpWhy = mode.name;
               lapEvents.push({ lap, id: c.id, kind: 'limp', text: `${comp.name.toLowerCase()}: ${mode.name}, running slowly`, part: comp.id });
             } else {
-              const repair = rng.float(...mode.repair) * c.mech;
-              t += P.pit.base + repair;
+              const repair = rng.float(...mode.repair) * c.mech * repF;
+              t += P.pit.base * pitF + repair;
               st.km *= 0.3;
               c.pits++;
               c.pitted = true;
-              c.stops.push({ lap, why: mode.name, sec: Math.round(P.pit.base + repair) });
+              c.stops.push({ lap, why: mode.name, sec: Math.round(P.pit.base * pitF + repair) });
               lapEvents.push({ lap, id: c.id, kind: 'repair', text: `${comp.name.toLowerCase()}: ${mode.name}, ${Math.round(repair)}s repair`, part: comp.id });
             }
             break;
@@ -206,10 +207,10 @@ export function* raceGenerator(setup) {
       if (!outNow) {
         const wearIn = len / (P.tyre.lifeKm * (0.6 + s.tyre.durability / 100 * 0.8)) * (1.2 - s.stats.smoothness / 250);
         c.tyreWear += wearIn;
-        const pp = P.tyre.punctureBase * len * (T.roughness + rainNow * P.tyre.rainRough) * (0.4 + 2.2 * c.tyreWear * c.tyreWear) / (0.5 + s.tyre.puncture / 100);
+        const pp = P.tyre.punctureBase * Math.max(relEra, 0.2) * len * (T.roughness + rainNow * P.tyre.rainRough) * (0.4 + 2.2 * c.tyreWear * c.tyreWear) / (0.5 + s.tyre.puncture / 100);
         if (rng.next() < pp) {
           const mode = rng.weighted(TYRE_FAILURES, (m) => m.w);
-          const repair = rng.float(...mode.repair);
+          const repair = rng.float(...mode.repair) * repF;
           t += repair;
           c.tyreWear = 0;
           c.pits++;
@@ -246,7 +247,7 @@ export function* raceGenerator(setup) {
               c.tyreWear = 0;
               did.push('tyres');
             }
-            sec *= c.mech;
+            sec *= c.mech * pitF;
             t += sec;
             c.pits++;
             c.pitted = true;

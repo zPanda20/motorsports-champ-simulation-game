@@ -1,13 +1,15 @@
-// Seasons: attendance, pre-qualifying, qualifying, the race, standings, rollover.
+// Seasons: attendance, pre-qualifying, qualifying, the race, standings, archive, rollover.
 
-import { makeRng, clamp } from './rng.js';
+import { makeRng } from './rng.js';
 import { PARAMS as P } from './params.js';
-import { TRACK_BY_ID } from './data/tracks.js';
-import { statsAt, STAT_KEYS, retirementChance, overallAt, peakOverall } from './drivers.js';
+import { TRACK_BY_ID, trackAt } from './data/tracks.js';
+import { eventsFor } from './data/events.js';
+import { statsAt, STAT_KEYS } from './drivers.js';
 import { qualifyingTime, raceGenerator, simulateRace, lapsFor } from './race.js';
 import {
-  startSeason, entryById, driverById, teamById, brandById, tyreById, activeDrivers, buildAllCars,
+  startSeason, entryById, driverById, teamById, brandById, tyreById, activeEntries, buildAllCars, logEvent,
 } from './world.js';
+import { industryTransition } from './industry.js';
 
 // ---- standings ----
 
@@ -49,11 +51,16 @@ function starterFor(world, entry, year) {
 
 export function attendingEntries(world) {
   const s = world.season;
-  return world.entries.filter((e) => {
+  return activeEntries(world).filter((e) => {
     if (e.driverId == null) return false;
     if (e.type === 'full') return true;
     return (s.partialPlan[e.id] || []).indexOf(s.round) >= 0;
   });
+}
+
+export function currentTrack(world) {
+  const s = world.season;
+  return trackAt(TRACK_BY_ID[s.calendar[s.round]], world.year);
 }
 
 // The full pre-race process for the next round. Returns everything the race needs.
@@ -61,7 +68,7 @@ export function prepareRound(world) {
   const s = world.season;
   const year = world.year;
   const round = s.round;
-  const track = TRACK_BY_ID[s.calendar[round]];
+  const track = currentTrack(world);
   const laps = lapsFor(track, world.regs);
   const seed = world.seed;
 
@@ -71,7 +78,7 @@ export function prepareRound(world) {
   if (round > 0) {
     const ranked = standing.filter((r) => {
       const e = entryById(world, r.id);
-      return e && e.type === 'full' && attending.indexOf(e) >= 0;
+      return e && e.active && e.type === 'full' && attending.indexOf(e) >= 0;
     });
     for (const r of ranked.slice(0, world.regs.exemptTop)) exemptIds.add(r.id);
   }
@@ -112,15 +119,12 @@ export function applyRoundResult(world, prep, result) {
   const st = s.standings;
   const regsScoring = world.regs.scoring;
   for (const row of result.classification) {
-    const e = entryById(world, row.entryId);
     const d = driverById(world, row.driverId);
     const brand = brandById(world, row.brandId);
     for (const [map, id] of [[st.entries, row.entryId], [st.drivers, row.driverId], [st.brands, row.brandId]]) {
       if (!map[id]) map[id] = blank();
       map[id].starts++;
-      if (row.points) {
-        map[id].pts += row.points;
-      }
+      if (row.points) map[id].pts += row.points;
       if (row.pos && row.pos <= regsScoring.length) {
         while (map[id].places.length < regsScoring.length) map[id].places.push(0);
         map[id].places[row.pos - 1] += 1;
@@ -129,12 +133,11 @@ export function applyRoundResult(world, prep, result) {
     }
     d.starts++;
     if (row.pos === 1) { d.wins++; brand.wins++; teamById(world, row.teamId).wins++; }
-    void e;
   }
 
   // in-season development: technical director plus driver Feedback, capped
-  for (const e of world.entries) {
-    if (e.driverId == null) continue;
+  for (const e of activeEntries(world)) {
+    if (e.driverId == null || !e.car) continue;
     const team = teamById(world, e.teamId);
     const d = driverById(world, e.driverId);
     const fb = statsAt(d, world.year).feedback;
@@ -143,7 +146,7 @@ export function applyRoundResult(world, prep, result) {
   }
 
   const summary = {
-    round: result.round, trackId: result.trackId, laps: result.laps, distanceKm: result.distanceKm, rain: result.rain,
+    round: result.round, trackId: result.trackId, laps: result.laps, distanceKm: result.distanceKm, lengthKm: result.lengthKm, rain: result.rain,
     starters: result.starters, finishers: result.finishers, winnerEntryId: result.winnerEntryId, winnerTime: result.winnerTime,
     fastest: result.fastest,
     prequal: { exempt: prep.prequal.exempt, failed: prep.prequal.failed, slots: prep.prequal.slots },
@@ -171,8 +174,11 @@ export function runSeason(world) {
   return out;
 }
 
-// ---- year rollover ----
+// ---- archive and year rollover ----
 
+const slim = (rows) => rows.map((r) => ({ id: r.id, pts: r.pts, wins: r.wins }));
+
+// Files the finished season into history. Returns what the industry needs to know.
 export function endSeason(world) {
   const s = world.season;
   const ds = driverStandings(world);
@@ -184,68 +190,45 @@ export function endSeason(world) {
   if (champBrand) champBrand.titles++;
   const champEntry = es[0] ? entryById(world, es[0].id) : null;
   if (champEntry) teamById(world, champEntry.teamId).titles++;
-  const record = {
+
+  world.history.seasons.push({
     year: s.year,
     calendar: s.calendar,
     champion: champ ? { id: champ.id, name: champ.name, pts: ds[0].pts } : null,
     championBrand: champBrand ? { id: champBrand.id, name: champBrand.name, pts: bs[0].pts } : null,
-    drivers: ds.slice(0, 10).map((r) => ({ id: r.id, name: driverById(world, r.id).name, pts: r.pts, wins: r.wins })),
-    entries: es.slice(0, 10).map((r) => ({ id: r.id, number: entryById(world, r.id).number, pts: r.pts })),
-    winners: s.results.map((r) => r.winnerEntryId),
-    finisherCounts: s.results.map((r) => r.finishers),
-    results: s.results.map((r) => ({ round: r.round, trackId: r.trackId, winnerEntryId: r.winnerEntryId, starters: r.starters, finishers: r.finishers, classification: r.classification.slice(0, 10) })),
-  };
-  world.history.seasons.push(record);
-  return record;
+    championTeam: champEntry ? { id: champEntry.teamId, name: teamById(world, champEntry.teamId).name } : null,
+    final: { drivers: slim(ds.slice(0, 20)), entries: slim(es.slice(0, 30)), brands: slim(bs) },
+    // full race reports; the lap-by-lap order and overtake lines of past seasons are dropped to keep saves small
+    results: s.results.map((r) => ({ ...r, lapOrders: undefined, events: r.events.filter((e) => e.kind !== 'pass') })),
+  });
+
+  // what the industry reads at the turn of the year
+  const brandRank = {};
+  bs.forEach((r, i) => { brandRank[r.id] = bs.length > 1 ? i / (bs.length - 1) : 0; });
+  const teamRank = {};
+  es.forEach((r, i) => {
+    const e = entryById(world, r.id);
+    if (e && teamRank[e.teamId] === undefined) teamRank[e.teamId] = es.length > 1 ? i / (es.length - 1) : 0;
+  });
+  return { brandRank, teamRank, titleBrandId: champBrand ? champBrand.id : null };
 }
 
 export function advanceYear(world) {
   if (!world.season.done) throw new Error('Season is not finished');
-  const record = endSeason(world);
-  const nextYear = world.year + 1;
-  const rng = makeRng(world.seed, 'rollover', nextYear);
+  let last = endSeason(world);
+  const record = world.history.seasons[world.history.seasons.length - 1];
 
-  // brands drift a little (emergent)
-  for (const b of world.brands) {
-    b.strength = clamp(Math.round((b.strength + rng.fork('b', b.id).gauss(0, 0.025)) * 1000) / 1000, 0.2, 0.95);
-    b.chassisStrength = clamp(Math.round((b.chassisStrength + rng.fork('bc', b.id).gauss(0, 0.03)) * 1000) / 1000, 0.15, 0.97);
-    b.engineStrength = clamp(Math.round((b.engineStrength + rng.fork('be', b.id).gauss(0, 0.03)) * 1000) / 1000, 0.15, 0.97);
-    b.reliability = clamp(Math.round((b.reliability + rng.fork('br', b.id).gauss(0, 0.03)) * 1000) / 1000, 0.1, 0.97);
+  for (;;) {
+    world.year++;
+    const ev = industryTransition(world, world.year, last);
+    if (!ev.cancel) break;
+    world.history.seasons.push({ year: world.year, cancelled: { name: ev.names.join(', ') }, champion: null, championBrand: null, final: null, results: [] });
+    logEvent(world, world.year, 'event', 'No championship is held.');
+    last = null;
   }
-
-  // retirements, then fill vacant seats from the free pool
-  for (const d of world.drivers) {
-    if (d.status !== 'active' || d.birthYear > world.year - P.world.startAge) continue;
-    const p = retirementChance(d, nextYear);
-    if (p > 0 && rng.fork('retire', d.id).next() < p) {
-      d.status = 'retired';
-      d.retiredYear = nextYear;
-      for (const e of world.entries) if (e.driverId === d.id) e.driverId = null;
-    }
-  }
-  world.year = nextYear;
-  fillVacancies(world, rng.fork('hire'));
-  buildAllCars(world, makeRng(world.seed, 'cars', nextYear));
+  buildAllCars(world, makeRng(world.seed, 'cars', world.year));
   startSeason(world);
   return record;
 }
 
-function fillVacancies(world, rng) {
-  const used = new Set(world.entries.map((e) => e.driverId).filter((x) => x != null));
-  let pool = activeDrivers(world).filter((d) => !used.has(d.id) && world.year - d.birthYear <= 44);
-  const scored = () => pool.map((d) => ({ d, s: overallAt(d, world.year) * 0.5 + peakOverall(d) * 0.5 + rng.gauss(0, 4) })).sort((a, b) => b.s - a.s);
-  const vacant = world.entries.filter((e) => e.driverId == null);
-  const teamRank = (e) => teamById(world, e.teamId).wealth;
-  vacant.sort((a, b) => teamRank(b) - teamRank(a) || a.id - b.id);
-  for (const e of vacant) {
-    const ranked = scored();
-    if (!ranked.length) break;
-    const idx = Math.min(ranked.length - 1, Math.floor(Math.abs(rng.gauss(0, 3))));
-    const d = ranked[idx].d;
-    e.driverId = d.id;
-    d.tier = 1;
-    pool = pool.filter((x) => x.id !== d.id);
-  }
-}
-
-export { raceGenerator, STAT_KEYS };
+export { raceGenerator, STAT_KEYS, eventsFor };

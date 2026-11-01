@@ -2,7 +2,7 @@
 
 import { makeRng, hashString } from '../public/engine/rng.js';
 import { makePersonName, makeTeamName, isRealDriverName, NATIONALITIES } from '../public/engine/names.js';
-import { createWorld, entryById } from '../public/engine/world.js';
+import { createWorld, entryById, driverById, activeEntries, SAVE_VERSION } from '../public/engine/world.js';
 import { legendRoster, statsAt, STAT_KEYS } from '../public/engine/drivers.js';
 import { prepareRound, applyRoundResult, runRound, runSeason, entryStandings, advanceYear } from '../public/engine/season.js';
 import { raceGenerator, simulateRace } from '../public/engine/race.js';
@@ -69,7 +69,7 @@ test('names: generator never returns empty or odd names', () => {
 // ---- legends ----
 test('legends: roster is pinned (fixed identities) and about 70 over the first 90 years', () => {
   const a = legendRoster();
-  eq(hashString(JSON.stringify(a)), '23f2565e', 'legend roster changed: update the pin only if that is intended');
+  eq(hashString(JSON.stringify(a)), '76695190', 'legend roster changed: update the pin only if that is intended');
   const n = a.filter((l) => l.birthYear <= 1962).length;
   assert(n > 45 && n < 110, 'count ' + n);
 });
@@ -232,9 +232,9 @@ test('season: several years roll over cleanly and stay deterministic', () => {
 // ---- golden results: the same on every machine and browser ----
 test('golden: world and season results match the pinned values', () => {
   const w = createWorld({ seed: 'golden' });
-  eq(hashString(JSON.stringify(w)), '4cc43b70', 'world creation changed (update pin only if intended)');
+  eq(hashString(JSON.stringify(w)), '0a8c0b45', 'world creation changed (update pin only if intended)');
   runSeason(w);
-  eq(hashString(JSON.stringify(w.season)), '3ab55da6', 'race simulation changed (update pin only if intended)');
+  eq(hashString(JSON.stringify(w.season)), '76b28f5a', 'race simulation changed (update pin only if intended)');
 });
 
 // ---- saves ----
@@ -260,6 +260,70 @@ test('save: a 20-season save stays a reasonable size', () => {
   for (let y = 0; y < 20; y++) { runSeason(w); advanceYear(w); }
   const kb = serialize(w).length / 1024;
   assert(kb < 2500, 'save is ' + kb.toFixed(0) + ' KB');
+});
+
+// ---- long-run behaviour (slice 2) ----
+function century(seed, years) {
+  const w = createWorld({ seed });
+  const seen = { titleBrands: new Set(), empty: 0, starts: 0, women: 0, racing: new Set() };
+  for (let i = 0; i < years; i++) {
+    const rounds = runSeason(w);
+    if (!rounds.length) seen.empty++;
+    for (const { result } of rounds) for (const r of result.classification) { seen.starts++; if (driverById(w, r.driverId).gender === 'F') seen.women++; }
+    const rec = advanceYear(w);
+    if (rec.championBrand) seen.titleBrands.add(rec.championBrand.id);
+    for (const b of w.brands) if (b.status === 'racing') seen.racing.add(b.id);
+  }
+  return { w, seen };
+}
+const LONG = century('long-1', 105);
+
+test('long run: the sim keeps going for a century with a full grid every season', () => {
+  eq(LONG.seen.empty, 0);
+  assert(LONG.w.year > 2020, 'year ' + LONG.w.year);
+  assert(activeEntries(LONG.w).filter((e) => e.driverId != null).length >= 14, 'grid too small at the end');
+});
+test('long run: many different makers win titles and brands come and go', () => {
+  assert(LONG.seen.titleBrands.size >= 8, 'title makers ' + LONG.seen.titleBrands.size);
+  assert(LONG.seen.racing.size >= 20, 'makers that raced ' + LONG.seen.racing.size);
+  assert(LONG.w.brands.some((b) => b.status === 'defunct'), 'no maker ever left for good');
+});
+test('long run: men and women stay balanced on the grid', () => {
+  const share = LONG.seen.women / LONG.seen.starts;
+  assert(share > 0.38 && share < 0.62, 'women share ' + share.toFixed(2));
+});
+test('long run: war years cancel the championship and are recorded', () => {
+  const c = LONG.w.history.seasons.filter((h) => h.cancelled);
+  assert(c.length >= 5, 'cancelled seasons ' + c.length);
+  assert(c.every((h) => h.year >= 1939 && h.year <= 1946), 'cancelled outside the war');
+});
+test('long run: every played season keeps its full race reports in the chronicle', () => {
+  const played = LONG.w.history.seasons.filter((h) => !h.cancelled);
+  assert(played.length > 90);
+  assert(played.every((h) => h.results.length > 0 && h.results[0].classification.length > 0 && h.final), 'a season lost its reports');
+  assert(played.every((h) => h.results.every((r) => r.lapOrders === undefined)), 'lap orders should be dropped from the archive');
+});
+test('pool: drivers of both sexes are available from the first grid', () => {
+  const w = createWorld({ seed: 'gender-start' });
+  const g = w.entries.filter((e) => e.driverId != null).map((e) => driverById(w, e.driverId).gender);
+  const f = g.filter((x) => x === 'F').length;
+  assert(f >= g.length * 0.35 && f <= g.length * 0.65, `women ${f} of ${g.length}`);
+});
+test('save: a version 1 save is migrated and plays on', () => {
+  const w = createWorld({ seed: 'mig' });
+  runSeason(w); advanceYear(w); runRound(w);
+  // make it look like a slice-1 save
+  const old = deepClone(w);
+  old.version = 1;
+  delete old.chronicle; delete old.cohortThrough;
+  for (const d of old.drivers) delete d.gender;
+  for (const b of old.brands) { b.racing = b.status === 'racing'; delete b.status; delete b.raceYears; }
+  for (const t of old.teams) { delete t.active; }
+  for (const e of old.entries) { delete e.active; }
+  const loaded = deserialize(JSON.stringify({ format: 'msc-save', version: 1, world: old }), 'X');
+  eq(loaded.version, SAVE_VERSION);
+  runSeason(loaded); advanceYear(loaded); runSeason(loaded);
+  assert(loaded.history.seasons.length >= 2);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

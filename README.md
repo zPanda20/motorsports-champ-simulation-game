@@ -50,7 +50,8 @@ public/               the whole game (served as-is)
     recap.js          text recaps
     data/             components and failure modes, tracks (opening and closing years), brands, era defaults
 tests/run.js          unit tests
-tests/balance.js      headless balance harness
+tests/balance.js      1919 balance harness
+tests/century.js      whole-century harness
 scripts/              local server, text recap
 ```
 
@@ -70,8 +71,21 @@ scripts/              local server, text recap
 
 About 40% of starters finish, almost no race has no finisher, mechanical failures dominate accidents, 4-6 different winners per season, and better cars and better drivers win more often without it being decided in advance. All thresholds are in `tests/balance.js`; all knobs are in `public/engine/params.js`.
 
-## Known limits of slice 1
+## What changed in slice 2
 
-- 1919 era only is tuned. Later years run (the calendar, tracks and drivers roll over) but eras beyond the 1920s use placeholder speed and reliability scaling.
-- The track list had nothing running in 1919, so period venues (Brooklands, Sheepshead Bay, Tacoma, Le Mans' road circuit, Santa Monica, Elgin, Indianapolis, Mugello) are flagged `provisional` in `data/tracks.js`. Lengths and speeds are approximate.
-- No money, sponsors, fans, governor, team folding, lower tiers, safety cars, endurance rounds or regulation editing yet.
+- **Drivers never run out.** Birth cohorts are made one year at a time, 16 years ahead, so the pool lasts for any length of run. Legends are fixed through birth year 2045.
+- **Men and women in balance** from the 1919 grid on, in every cohort and among staff. Nationalities still weight toward the home countries early and mix over time.
+- **A living industry.** Every maker's strength mean-reverts with breakthroughs and crises, so no brand rules for decades. Makers can start racing (not before their real founding year), quit, go dormant, die and be revived. Privateer teams fold, are founded, and change supplier. Works-team counts follow the era.
+- **Historical events** (World Wars cancel the championship; others change the odds). Cancelled years appear in the Chronicle.
+- **Eras** change the regulation defaults, speeds, reliability, pit stops and repairs.
+- **Interface themes by era** (De Stijl in 1919 through to an acid style in the 2030s); the selector in the header can fix one theme.
+- **Chronicle menu**: pick any season, see changes in the industry, final standings and open every race report (result table, grid, incident feed). Saves from slice 1 migrate automatically.
+- **Automatic copy** now uses IndexedDB (a century of history is far larger than localStorage allows). A century save is roughly 10 MB.
+
+## Known limits
+
+- First names are not yet era-appropriate (a 1920s driver can have a modern first name).
+- No independent-constructor / legendary-team mechanic yet, and the driver market is still simple.
+- Archived seasons drop the lap-by-lap order and overtake lines to keep saves small.
+- The track list had nothing running in 1919, so period venues are flagged `provisional` in `data/tracks.js`.
+- No money, sponsors, fans, governor, lower tiers, endurance rounds or regulation editing yet.
