@@ -3,10 +3,11 @@
 // the state, so nothing about random streams needs saving.
 
 import { makeRng } from './rng.js';
-import { SAVE_VERSION, ensureCohorts, activeEntries, teamById, driverById } from './world.js';
+import { SAVE_VERSION, ensureCohorts, activeEntries, teamById, driverById, ensureOils, assignOil } from './world.js';
+import { initCorp } from './corp.js';
 import { defaultRegs, eraFor, scoringFor } from './data/eras.js';
 import { fillVacantSeats } from './industry.js';
-import { initTeamOrg, initBrandOrg, signContract } from './org.js';
+import { initTeamOrg, initBrandOrg, signContract, supplierDeals } from './org.js';
 import { bootstrapTiers, startTierSeasons, tiersAfterRound } from './tiers.js';
 
 export function serialize(world, device = '') {
@@ -78,6 +79,17 @@ export function migrate(world) {
     // in an old save the champion records carry no wins and podiums: the Chronicle derives them
     for (const t of world.teams) void teamById(world, t.id);
     void activeEntries;
+  }
+  if (world.version < 4) {
+    const year = world.year;
+    world.oils = world.oils || [];
+    world.programmes = world.programmes || [];
+    for (const b of world.brands) { b.names = b.names || [b.name]; if (b.corp === undefined) b.corp = null; }
+    initCorp(world, year);
+    ensureOils(world, year);
+    assignOil(world, makeRng(world.seed, 'mig-oil', year), year);
+    supplierDeals(world, year);
+    for (const t of world.teams) { if (!t.origin) t.origin = { type: t.kind === 'works' ? 'manufacturer' : 'investors', year: t.foundedYear }; if (t.oilId === undefined) t.oilId = t.oilId || null; }
   }
   world.version = SAVE_VERSION;
   return world;

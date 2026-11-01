@@ -1,6 +1,6 @@
 {
   "name": "motorsports-champ-simulation-game",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Single-player, offline motorsport series CEO simulation, 1919 onward. Deterministic seeded engine, static site.",
   "type": "module",
   "private": true,

@@ -1,3 +1,5 @@
+import { OIL_FROM, SUPPLIER_SPONSOR_IDS } from './oils.js';
+
 // Real sponsor brands with their real start and end windows (approximate).
 // sector decides fit; marquee sponsors have personalities and drive big stories.
 // reach: 'global' or a region id; risk: appetite for gambles on young drivers.
@@ -49,7 +51,10 @@ export const SPONSORS = [
 ];
 
 export const SPONSOR_BY_ID = Object.fromEntries(SPONSORS.map((s) => [s.id, s]));
-export const sponsorsOpenIn = (year) => SPONSORS.filter((s) => year >= s.from && year <= s.to);
+// From the year oil deals begin, fuel, oil and tyre companies are sponsors only as the
+// suppliers of a team (see engine/org.js): the same company must never appear twice and a
+// rival oil or tyre brand can not sponsor a team tied to another supplier.
+export const sponsorsOpenIn = (year) => SPONSORS.filter((s) => year >= s.from && year <= s.to && !(year >= OIL_FROM && (SUPPLIER_SPONSOR_IDS.has(s.id) || s.sector === 'tyres')));
 
 // Commercial sponsorship (team and driver sponsors) is allowed from 1968; before that
 // only prize money, manufacturer support and owners' pockets pay the bills.

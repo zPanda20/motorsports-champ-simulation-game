@@ -4,7 +4,10 @@ import { makeRng, clamp } from './rng.js';
 import { PARAMS } from './params.js';
 import { defaultRegs, eraFor } from './data/eras.js';
 import { eventsFor } from './data/events.js';
-import { BRANDS } from './data/brands.js';
+import { BRANDS, brandsAtStart, brandNameAt, engineOnlyAt, brandColors } from './data/brands.js';
+import { worksTargetFor, privTargetFor } from './data/curve.js';
+import { OILS, OIL_FROM, oilsOpenIn } from './data/oils.js';
+import { worksTeamName, effectiveBrand, initCorp } from './corp.js';
 import { tracksOpenIn, TRACK_BY_ID } from './data/tracks.js';
 import { initTiers, startTierSeasons } from './tiers.js';
 import { nationalityWeights, makePersonName, makeTeamName } from './names.js';
@@ -14,7 +17,7 @@ import { initTeamOrg, initBrandOrg, avgFac, budgetBase, signContract } from './o
 import { adoptionShares, usableTechs, techBonus } from './techs.js';
 import { regionOf } from './data/regions.js';
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 const TYRE_MAKERS = [
   { id: 'dunlop', name: 'Dunlop', country: 'GB', founded: 1889 },
@@ -110,7 +113,7 @@ export function newBrandObject(def, rng, year) {
   const strength = clamp(rng.gauss(0.55, 0.14), 0.25, 0.9);
   const r3 = (x) => Math.round(x * 1000) / 1000;
   return {
-    id: def.id, name: def.name, country: def.country, founded: def.founded, foundedInGame: year,
+    id: def.id, name: brandNameAt(def, year), names: [brandNameAt(def, year)], country: def.country, founded: def.founded, foundedInGame: year, corp: null,
     strength: r3(strength),
     chassisStrength: r3(clamp(strength + rng.gauss(0, 0.08), 0.2, 0.95)),
     engineStrength: r3(clamp(strength + rng.gauss(0, 0.08), 0.2, 0.95)),
@@ -138,7 +141,7 @@ export function addEntry(world, team, type, rng) {
 
 // Gives a team the entries its kind and the regulations call for (reusing dormant ones).
 export function syncEntries(world, team, rng) {
-  const want = team.kind === 'works' ? Math.min(2, world.regs.entries.full) : 1;
+  const want = team.kind === 'works' || team.twoCars ? Math.min(2, world.regs.entries.full) : 1;
   const mine = world.entries.filter((e) => e.teamId === team.id);
   const fulls = mine.filter((e) => e.type === 'full');
   const activeFull = fulls.filter((e) => e.active);
@@ -164,7 +167,8 @@ export function activateWorks(world, brand, rng, year) {
   if (!team) {
     const wealth = clamp(brand.strength + rng.gauss(0, 0.1), 0.2, 1);
     team = {
-      id: ++world.counters.team, name: brand.name + ' Works', nat: brand.country, kind: 'works', brandId: brand.id,
+      id: ++world.counters.team, name: worksTeamName(world, brand, year, rng.fork('name')), nat: brand.country, kind: 'works', brandId: brand.id,
+      origin: { type: 'manufacturer', year, by: brand.name },
       tyreId: rng.pick(world.tyres.map((t) => t.id)), wealth: Math.round(wealth * 100) / 100,
       staff: makeStaff(rng, brand.country, usedNames(world), wealth),
       control: rng.pick(['principal', 'engineer', 'driver']),
@@ -193,22 +197,45 @@ export function addPrivateerTeam(world, rng, year, opts = {}) {
   const nat = opts.nat || rng.weighted(nationalityWeights(year), (x) => x.w).n;
   const used = usedNames(world);
   const names = new Set(world.teams.map((t) => t.name));
-  const wealth = clamp(rng.gauss(opts.rich ? 0.6 : 0.35, 0.12), 0.1, opts.rich ? 0.9 : 0.7);
+  const wealth = opts.wealth !== undefined ? opts.wealth : clamp(rng.gauss(opts.rich ? 0.6 : 0.35, 0.12), 0.1, opts.rich ? 0.9 : 0.7);
   const team = {
-    id: ++world.counters.team, name: makeTeamName(rng, nat, names), nat, kind: 'privateer',
+    id: ++world.counters.team, name: opts.name || makeTeamName(rng, nat, names), nat, kind: 'privateer',
     brandId: opts.brandId || pickSupplier(world, rng, null),
     tyreId: rng.pick(world.tyres.map((t) => t.id)), wealth: Math.round(wealth * 100) / 100,
     staff: makeStaff(rng, nat, used, wealth),
     control: rng.pick(['principal', 'engineer', 'driver']),
     owner: { patience: rng.int(25, 80), pockets: Math.round(wealth * 100) },
     active: true, titles: 0, wins: 0, foundedYear: year, endedYear: null,
+    colors: makeLivery(rng.fork('livery'), nat, year),
+    origin: opts.origin || { type: 'investors', year },
   };
   if (opts.groupId) { team.groupId = opts.groupId; team.relation = opts.relation; team.parentId = opts.parentId; }
+  if (opts.builder) team.constructorTeam = true;
+  if (opts.partner) team.partner = opts.partner;
   world.teams.push(team);
   initTeamOrg(world, team, rng.fork('org'), year);
+  if (opts.staff) Object.assign(team.staff, opts.staff);
+  if (opts.owner) team.owner = { ...team.owner, ...opts.owner };
+  if (opts.facilities) Object.assign(team.facilities, opts.facilities);
+  if (opts.prestige !== undefined) team.prestige = Math.max(team.prestige, opts.prestige);
+  if (opts.fans !== undefined) team.fans = Math.max(team.fans, opts.fans);
+  if (opts.twoCars) team.twoCars = true;
   syncEntries(world, team, rng);
   if (world.regs.entries.partial >= 1 && wealth > 0.3 && rng.chance(0.35)) addEntry(world, team, 'partial', rng);
   return team;
+}
+
+// National racing colours of the early years, then whatever the sponsors paint.
+const NATIONAL = {
+  FR: ['#1a3d8f', '#f2f2f2'], IT: ['#b3141c', '#f2f2f2'], DE: ['#aeb4bd', '#222222'], GB: ['#0f5a38', '#e8d44a'], US: ['#1e4fa8', '#e8e8e8'],
+  BE: ['#e8c71a', '#111111'], NL: ['#f26b1d', '#1e3f8a'], CH: ['#c8102e', '#f2f2f2'], SE: ['#1b5aa6', '#f2c200'], AT: ['#c8102e', '#f2f2f2'],
+  AU: ['#0b7a3b', '#f4c20d'], JP: ['#c8102e', '#f2f2f2'], KR: ['#003478', '#f2f2f2'], ES: ['#c8102e', '#f4c20d'], AR: ['#74acdf', '#f2f2f2'],
+  BR: ['#0b7a3b', '#f4c20d'], CA: ['#c8102e', '#f2f2f2'],
+};
+const PAINTS = [['#d62828', '#f7f7f7'], ['#1d3557', '#f1c453'], ['#2a9d8f', '#264653'], ['#f77f00', '#1b1b1b'], ['#6a4c93', '#f2e9e4'], ['#0b6e4f', '#f2c14e'], ['#e63946', '#1d3557'], ['#118ab2', '#ffd166'], ['#7b2cbf', '#f3f3f3'], ['#222222', '#f4c20d'], ['#ef476f', '#073b4c'], ['#8ac926', '#222222']];
+export function makeLivery(rng, nat, year) {
+  if (year < 1968 || rng.chance(0.25)) return (NATIONAL[nat] || NATIONAL.GB).slice();
+  return rng.pick(PAINTS).slice();
 }
 
 // Brings a closed team back under new investors, keeping its record and facilities.
@@ -237,6 +264,8 @@ export function createWorld({ seed, year = 1919, governor = 'traditionalist', mo
     year,
     regs: defaultRegs(year),
     tyres: [],
+    oils: [],
+    programmes: [],
     brands: [],
     teams: [],
     entries: [],
@@ -271,19 +300,22 @@ export function createWorld({ seed, year = 1919, governor = 'traditionalist', mo
   }
 
   // every brand already trading
-  for (const b of BRANDS) {
-    if (b.founded > year) continue;
-    world.brands.push(newBrandObject(b, makeRng(seed, 'brand', b.id), year));
+  for (const b of brandsAtStart(year)) {
+    const o = newBrandObject(b, makeRng(seed, 'brand', b.id), year);
+    if (b.engineOnly) o.sellsCustomers = true;
+    world.brands.push(o);
   }
+  initCorp(world, year);
+  ensureOils(world, year);
 
   ensureCohorts(world, year + 16);
 
   // works teams: random but leaning to the stronger brands
   {
     const rng = makeRng(seed, 'world', 'teams');
-    const pool = world.brands.slice();
+    const pool = world.brands.filter((b) => !engineOnlyAt(b.id, year));
     const chosen = [];
-    const target = Math.min(eraFor(year).worksTarget, pool.length);
+    const target = Math.min(worksTargetFor(year), pool.length);
     while (chosen.length < target) {
       const b = rng.weighted(pool, (x) => x.strength + 0.25);
       chosen.push(b);
@@ -292,7 +324,9 @@ export function createWorld({ seed, year = 1919, governor = 'traditionalist', mo
     chosen.sort((a, b) => b.strength - a.strength);
     chosen.slice(0, 3).forEach((b) => { b.sellsCustomers = true; });
     for (const b of chosen) activateWorks(world, b, rng.fork('works', b.id), year);
-    for (let i = 0; i < PARAMS.world.privateerTeams; i++) addPrivateerTeam(world, rng.fork('priv', i), year);
+    // makers that only build engines: the strongest two already supply the grid
+    world.brands.filter((b) => engineOnlyAt(b.id, year)).sort((a, b) => b.strength - a.strength || a.id.localeCompare(b.id)).slice(0, 2).forEach((b) => { b.status = 'racing'; });
+    for (let i = 0; i < privTargetFor(year); i++) addPrivateerTeam(world, rng.fork('priv', i), year);
     // two privateers also run a part-season second car, as in the original grid
     let given = 0;
     for (const t of world.teams.filter((x) => x.kind === 'privateer')) {
@@ -304,6 +338,7 @@ export function createWorld({ seed, year = 1919, governor = 'traditionalist', mo
   world.regs.overridden = {};
   assignDrivers(world, makeRng(seed, 'world', 'grid'));
   assignTyres(world, makeRng(seed, 'world', 'tyre-assign'), year);
+  assignOil(world, makeRng(seed, 'world', 'oil-assign'), year);
   buildAllCars(world, makeRng(seed, 'world', 'cars', year));
   initTiers(world, year, makeRng(seed, 'world', 'tiers'));
   startSeason(world);
@@ -341,12 +376,18 @@ function assignDrivers(world, rng) {
 
 // Which brand-like object a team's car is built from this year. Under strict chassis
 // rules a privateer is a constructor: its own chassis (from its people and factory)
-// with a bought engine.
-function carBrandFor(world, team, brand) {
-  if (team.kind === 'works' || world.regs.chassisSupply !== 'strict') return { b: brand, customer: team.kind !== 'works' };
+// with a bought engine. A team founded as a constructor, or one running an engine-only
+// maker's engine, always builds its own chassis. A preferred partner of the engine maker
+// gets works-specification engines and the best fit; other customers get a little less.
+function carBrandFor(world, team, brandIn) {
+  const brand = effectiveBrand(world, brandIn);
+  const builder = team.kind !== 'works' && (team.constructorTeam || engineOnlyAt(brand.id, world.year) || world.regs.chassisSupply === 'strict');
+  if (!builder) return { b: brand, customer: team.kind !== 'works' };
   const ts = clamp(0.22 + team.wealth * 0.3 + (team.staff.techDirector.rating - 50) / 220 + (avgFac(team) - 40) / 280, 0.2, 0.9);
   const rel = clamp(brand.reliability * 0.5 + ts * 0.5, 0.15, 0.95);
-  return { b: { id: brand.id, chassisStrength: ts, engineStrength: brand.engineStrength, reliability: rel }, customer: false, constructor: true };
+  const pref = team.partner && team.partner.preferred && team.partner.brandId === brand.id;
+  const eng = clamp(brand.engineStrength + (pref ? 0.025 : -0.015), 0.1, 0.97);
+  return { b: { id: brand.id, chassisStrength: ts, engineStrength: eng, reliability: rel }, customer: false, constructor: true, preferred: !!pref };
 }
 
 export function buildAllCars(world, rng) {
@@ -356,11 +397,14 @@ export function buildAllCars(world, rng) {
   for (const e of activeEntries(world)) {
     const team = teamById(world, e.teamId);
     const brand = brandById(world, team.brandId);
-    const { b, customer, constructor } = carBrandFor(world, team, brand);
+    const { b, customer, constructor, preferred } = carBrandFor(world, team, brand);
     team.builder = !!constructor;
     const ids = usableTechs(world, team, year);
     const bonus = techBonus(ids, shares);
-    items.push({ e, team, b, customer, ids, bonus });
+    // the oil deal: a better supplier is worth a little power and a little reliability
+    const oil = team.oilId ? world.oils.find((o) => o.id === team.oilId) : null;
+    if (oil) { bonus.power += (oil.power - 50) * 0.05; bonus.rel += (oil.rel - 50) * 0.06; }
+    items.push({ e, team, b, customer, ids, bonus, preferred });
   }
   // centre the technology bonus on the grid, so only the differences matter
   const keys = ['handling', 'brakes', 'power', 'rel', 'weight'];
@@ -369,9 +413,10 @@ export function buildAllCars(world, rng) {
   for (const it of items) for (const k of keys) it.bonus[k] -= mean[k];
 
   for (const it of items) {
-    const { e, team, b, customer, ids, bonus } = it;
+    const { e, team, b, customer, ids, bonus, preferred } = it;
     const r = rng.fork('entry', e.id);
     const fresh = buildCar(r, { brand: b, staff: team.staff, customer, year, bonus, facilities: avgFac(team), techs: ids });
+    if (preferred) fresh.fit = Math.min(94, fresh.fit + 6);
     const prev = e.car;
     const redesign = !prev || prev.epoch !== world.epoch || (year - prev.designYear) >= (team.cycle || 4) || (prev.techs && ids.some((id) => prev.techs.indexOf(id) < 0 && ['monocoque', 'rearEngine', 'carbonFibre', 'groundEffect'].indexOf(id) >= 0));
     const devGain = (team.finance ? team.finance.devPower : 1) * (team.staff.techDirector.rating / 100) * 1.1;
@@ -413,6 +458,58 @@ export function assignTyres(world, rng, year) {
       const r = rng.fork('excl', t.id);
       if (!makers.some((m) => m.id === t.tyreId) || r.chance(0.06)) t.tyreId = r.weighted(makers, (m) => score(m)).id;
     }
+  }
+}
+
+// ---------------------------------------------------------------- oil and fuel suppliers
+
+// Suppliers appear in the year their real company starts supplying (never before 1960).
+export function ensureOils(world, year) {
+  world.oils = world.oils || [];
+  for (const o of oilsOpenIn(year)) {
+    if (world.oils.some((x) => x.id === o.id)) continue;
+    const r = makeRng(world.seed, 'oil', o.id);
+    world.oils.push({ id: o.id, power: Math.round(clamp(r.gauss(50, 8), 32, 70)), rel: Math.round(clamp(r.gauss(50, 8), 32, 70)), since: year });
+    if (year > OIL_FROM && o.from === year) logEvent(world, year, 'oil', `${oilNameOf(o, year)} begins supplying teams.`);
+  }
+  // a supplier whose real company has stopped leaves
+  world.oils = world.oils.filter((x) => { const d = OILS.find((o) => o.id === x.id); return !d || year <= d.to; });
+}
+const oilNameOf = (o, year) => { let n = o.name; for (const [from, name] of (o.names || [])) if (year >= from) n = name; return n; };
+
+export function developOils(world, year, rng) {
+  for (const o of world.oils) {
+    const r = rng.fork(o.id);
+    o.power = Math.round(clamp(o.power + r.gauss(0.2, 2.4), 25, 85));
+    o.rel = Math.round(clamp(o.rel + r.gauss(0.2, 2.4), 25, 85));
+  }
+}
+
+// Every team has an oil deal of one to four years from 1960. Suppliers favour their home
+// region and strongest products; no supplier takes more than about a quarter of the grid.
+export function assignOil(world, rng, year) {
+  if (year < OIL_FROM || !world.oils.length) { for (const t of world.teams) if (year < OIL_FROM) t.oilId = null; return; }
+  const open = new Set(world.oils.map((o) => o.id));
+  const teams = world.teams.filter((t) => t.active).sort((a, b) => a.id - b.id);
+  const cap = Math.max(2, Math.ceil(teams.length * 0.28));
+  const load = {};
+  for (const t of teams) if (t.oilId && open.has(t.oilId) && (t.oilUntil || 0) >= year) load[t.oilId] = (load[t.oilId] || 0) + 1;
+  for (const t of teams) {
+    if (t.oilId && open.has(t.oilId) && (t.oilUntil || 0) >= year) continue;
+    const r = rng.fork('t', t.id);
+    const stay = t.oilId && open.has(t.oilId) && r.chance(0.55) && (load[t.oilId] || 0) < cap;
+    if (stay) { t.oilUntil = year + r.int(0, 3); load[t.oilId] = (load[t.oilId] || 0) + 1; continue; }
+    const pool = world.oils.filter((o) => (load[o.id] || 0) < cap);
+    const pick = r.weighted(pool.length ? pool : world.oils, (o) => {
+      const d = OILS.find((x) => x.id === o.id);
+      let w = 10 + (o.power + o.rel) / 4 + d.size * 12;
+      if (d.home === t.region) w *= 2.4;
+      if (d.country === t.nat) w *= 1.6;
+      if (t.oilId === o.id) w *= 0.3;
+      return w;
+    });
+    t.oilId = pick.id; t.oilUntil = year + r.int(0, 3);
+    load[pick.id] = (load[pick.id] || 0) + 1;
   }
 }
 

@@ -2,7 +2,7 @@
 
 A single-player, offline motorsport "series CEO" simulation. You run the governing body of one championship, starting in 1919 and running for a hundred years or more. Teams, makers, sponsors and drivers come and go; technology and rules change with the era; a ladder of lower series grows beneath you. Watch every race lap by lap, or let the seasons run themselves.
 
-This is **slice 3**: money, owners, technology, the governor and the tier ladder, with a page for every team, driver, maker, sponsor, series and track.
+This is **slice 4**: the sport's corporate history (works teams that come and go, founders, mergers, groups, oil suppliers), team colours on every table, and a distinct look for each period theme. Slice 3 added money, owners, technology, the governor and the tier ladder, with a page for every team, driver, maker, sponsor, series and track.
 
 ## Run it
 
@@ -76,6 +76,19 @@ About 40% of starters finish, almost no race has no finisher, mechanical failure
 
 Download the repo ZIP again (or `git pull`) and replace the folder. Saves from earlier versions load and are upgraded: they gain owners, finances, the lower-tier ladder, the governor and the era points table. If the page still looks like the first version, the browser is showing old files: hold Ctrl and press F5, and check that the header shows the tabs *Teams, Drivers, Tiers, Makers & tech, Approvals, Rules, Chronicle, Records*.
 
+## What is in slice 4
+
+- **No Ferrari, no McLaren.** Brands like them arise through the story instead: a former champion founds a team (directly in the top series, or in a continental series and climbs up), or a brilliant engineer founds one, partners with a maker and becomes its de facto works team with a preference for that maker's engine (the Williams and Sauber path). A team's page says where it came from.
+- **Works teams follow the sport's shape.** Plentiful before the war, rare after the 1940s, a couple from the 1960s to the 1970s, slight growth in the 1980s, a dip in the 1990s, a boom in the 2000s that ends with the 2008 crash, then a wave of makers buying teams back from 2014. When a maker leaves it often sells its team to its engineers, a big sponsor brand, a former champion or investors, who keep the colours and the factory (Brawn, Red Bull, Stewart). The curve is in `engine/data/curve.js`.
+- **Engine-only makers.** BRM, Coventry Climax, Cosworth, Judd, Ilmor, and Mercedes from 1955 to 2009, build engines for others and never run a works team in that window. Works teams are named in the style of their country (Scuderia, Écurie, Rennabteilung, Racing) and take a performance division's name once it is real (Mercedes AMG, Honda Mugen, Toyota Gazoo).
+- **Mergers and groups on the real dates.** Daimler and Benz (1926), Audi, Horch, DKW and Wanderer into Auto Union (1932, with their works teams joining into one), Volkswagen buying NSU (1969), renames in 1960 and 1978. Real groups (Volkswagen Group, Mopar, Fiat Chrysler and Stellantis, PSA, GM, Ford, British Leyland, Renault-Nissan, Geely and others) form and break up on their real timelines; sister makers in a group can share an engine, a chassis, a whole car or pooled development, and not every programme works. Pages: Makers & tech has a Groups link, every group has a page.
+- **Oil and fuel suppliers from 1960.** 27 suppliers (Shell to Bapco Energies), a deal of one to four years per team, a small power and reliability effect, and the supplier is also the team's sponsor. A rival oil company cannot sponsor a team tied to another supplier. Pages: `#/oil/<id>`, and tyre makers have pages too.
+- **Colours.** Maker and team pages are in brand colours. The running order and the standings are in team colours (a left stripe and a faint wash), and works teams carry their maker's badge beside the team name; a maker without a drawn badge gets a monogram in its colours until one is drawn. Sold-off teams keep their old colours.
+- **More history.** The Chronicle links every year to that season's points tables (`#/standings/<year>`, with the rounds, and next and previous year). Each series has its own Chronicle and Records tabs, and the Tiers page links to them. Driver pages list the team driven for, year by year, with the car's source.
+- **Look.** `public/themes.css` gives each period theme a structure of its own (De Stijl blocks, Bauhaus shapes, Constructivist slabs, Atomic Age shapes, Swiss grid, PC-98 windows, Y2K gel, Memphis confetti, and so on); Vaporwave is unchanged. Every theme was checked for text contrast.
+- **Balance.** One all-time great could win a dozen titles in a row, so the driver-skill curve bends again above 82 and legend talent is capped. Over 12 seeded centuries the longest title streak averages about 6 (limit 10). Tier 1 churn from 2000 to 2030 is high on purpose, because of the 2008 to 2010 sell-off and the 2014 to 2017 buy-in waves.
+- **Saves.** Save version 4. Older saves load and gain oil suppliers, groups and team origins, but they still contain Ferrari and McLaren: start a new series to see the new history.
+
 ## What is in slice 3
 
 - **Pages for everything.** Every name is a link: team (line-up, contracts, staff, facilities, owner and goals, finances, sponsors, car and technology, relationships, season history), driver (abilities, career, ladder record, teams), maker, sponsor, series, lower-tier team, track.
@@ -126,11 +139,13 @@ Partly built:
 - The cost cap is on or off, not an amount.
 - Lower-tier races are simulated and their results (podiums, classifications for notable series) are readable, but you cannot yet watch one lap by lap.
 - The race viewer follows a driver, not a team.
-- Churn is about 54% of Tier 1 teams between 2000 and 2030 (target at most 50%); the team count settles at 13 to 14 (target 10 to 15).
+- Churn is about 70% of Tier 1 teams between 2000 and 2030, by design (the 2008 crash and the 2014 buy-in wave); the team count settles at 12 to 18.
+- Badges: only eight makers have a drawn logo, everyone else shows a monogram in brand colours.
+- On very narrow screens (about 420 px) wide tables scroll the whole page sideways.
 
 Not built yet:
 
-- Manufacturer mergers and rebadging (Lotus-BRM, Matra-Renault). Team sales and rebranding exist; makers only start, quit and revive.
+- Rebadging deals between a maker and an independent team (Lotus-BRM, Matra-Renault) beyond engine partnerships.
 - A lead driver running an endurance race solo.
 - Hometowns for the upcoming cohort.
 - Draw or entry-order grids for the earliest races (qualifying is always timed).
@@ -148,18 +163,20 @@ Results are identical on every machine and browser: the engine uses only `+ - * 
 ```
 public/                 the whole game (served as-is)
   index.html style.css app.js      shell: router, race viewer, buttons
-  ui/pages.js common.js            every page as a function from the world to HTML
+  ui/pages.js common.js colors.js  every page as a function from the world to HTML; brand and team colours, badges
+  themes.css                       the structural design of each period theme
   engine/
     rng.js params.js names.js drivers.js   seeded streams, tunables, names, drivers
     car.js techs.js                 cars, components, technology adoption
     world.js industry.js season.js  world creation, makers and teams, the season loop
     org.js                          owners, facilities, money, sponsors, lifecycle, groups
+    corp.js founders.js             mergers, corporate groups, shared programmes; founders, sell-offs and buy-ins
     tiers.js                        local scenes and the lower-tier ladder, scouting, academies
     governor.js                     personalities, approvals inbox, regulations
     records.js                      title tables, records, rivalries, track history
     race.js save.js recap.js        lap-by-lap race, saves and migration, text recaps
-    data/                           components, tracks, eras, techs, sponsors, regions, ladder, events
-tests/run.js            unit tests (50 or so)
+    data/                           components, tracks, eras, techs, sponsors, regions, ladder, events, corp, curve, oils
+tests/run.js            unit tests (60 or so)
 tests/balance.js        1919 balance harness
 tests/century.js        whole-century harness
 scripts/                local server, text recap

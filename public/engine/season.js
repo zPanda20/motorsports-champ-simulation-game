@@ -247,6 +247,37 @@ export function seasonTallies(results) {
   return { drivers, brands };
 }
 
+// The season's final tables for the archive. Each driver and entry row says which team and maker
+// it ran for, so a standings page and a driver's career can show the colours year by year.
+function finalTables(world, ds, es, bs, tallies) {
+  const s = world.season;
+  const dTeam = {}, dBrand = {};
+  for (const r of s.results) for (const row of r.classification) {
+    const t = (dTeam[row.driverId] = dTeam[row.driverId] || {}); t[row.teamId] = (t[row.teamId] || 0) + 1;
+    const b = (dBrand[row.driverId] = dBrand[row.driverId] || {}); b[row.brandId] = (b[row.brandId] || 0) + 1;
+  }
+  const top = (m) => { let best = null, n = -1; for (const k of Object.keys(m || {})) if (m[k] > n) { best = k; n = m[k]; } return best; };
+  const drivers = slim(ds.slice(0, 20), tallies.drivers).map((r) => {
+    const teams = Object.keys(dTeam[r.id] || {});
+    const o = { ...r, teamId: top(dTeam[r.id]), brandId: top(dBrand[r.id]) };
+    if (teams.length > 1) o.teamIds = teams;
+    return o;
+  });
+  const entries = slim(es.slice(0, 30)).map((r) => {
+    const e = entryById(world, r.id);
+    return e ? { ...r, teamId: e.teamId, brandId: teamById(world, e.teamId).brandId, number: e.number, driverId: e.driverId } : r;
+  });
+  const tm = {};
+  for (const row of es) {
+    const e = entryById(world, row.id);
+    if (!e) continue;
+    const t = (tm[e.teamId] = tm[e.teamId] || { id: e.teamId, pts: 0, wins: 0 });
+    t.pts += row.pts; t.wins += row.wins;
+  }
+  const teams = Object.values(tm).sort((a, b) => b.pts - a.pts || b.wins - a.wins).slice(0, 30).map((t) => ({ ...t, name: teamById(world, t.id).name, brandId: teamById(world, t.id).brandId }));
+  return { drivers, entries, teams, brands: slim(bs, tallies.brands).map((r) => { const b = brandById(world, r.id); return b ? { ...r, name: b.name } : r; }) };
+}
+
 // Files the finished season into history. Returns what the industry needs to know.
 export function endSeason(world) {
   const s = world.season;
@@ -291,7 +322,7 @@ export function endSeason(world) {
     champion: champ ? { id: champ.id, name: champ.name, pts: ds[0].pts, wins: ds[0].wins, podiums: cs.podiums, poles: cs.poles, starts: cs.starts, margin: ds[1] ? ds[0].pts - ds[1].pts : ds[0].pts } : null,
     championBrand: champBrand ? { id: champBrand.id, name: champBrand.name, pts: bs[0].pts, wins: bs[0].wins } : null,
     championTeam: champEntry ? { id: champEntry.teamId, name: teamById(world, champEntry.teamId).name } : null,
-    final: { drivers: slim(ds.slice(0, 20), tallies.drivers), entries: slim(es.slice(0, 30)), brands: slim(bs, tallies.brands) },
+    final: finalTables(world, ds, es, bs, tallies),
     // full race reports; the lap-by-lap order and overtake lines of past seasons are dropped to keep saves small
     results: s.results.map((r) => ({ ...r, lapOrders: undefined, classification: r.classification.map(compact), events: r.events.filter((e) => e.kind !== 'pass') })),
   });

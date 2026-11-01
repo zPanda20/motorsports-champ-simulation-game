@@ -13,6 +13,7 @@ import { pendingItems, resolveItem, settleAll, inviteBrand, expelBrand, setRegul
 import * as pages from './ui/pages.js';
 import { esc, table } from './ui/common.js';
 import { backgroundFor } from './ui/assets.js';
+import { teamBadge, teamPalette } from './ui/colors.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -164,27 +165,31 @@ function loadFile(file) {
 
 // ---------------------------------------------------------------- the router
 
-const TAB_OF = { race: 'race', standings: 'standings', teams: 'teams', team: 'teams', lowteam: 'tiers', drivers: 'drivers', driver: 'drivers', tiers: 'tiers', series: 'tiers', industry: 'industry', brand: 'industry', sponsor: 'industry', inbox: 'inbox', rules: 'rules', chronicle: 'chronicle', records: 'records', track: 'records' };
+const TAB_OF = { race: 'race', standings: 'standings', teams: 'teams', team: 'teams', lowteam: 'tiers', drivers: 'drivers', driver: 'drivers', tiers: 'tiers', series: 'tiers', industry: 'industry', brand: 'industry', sponsor: 'industry', group: 'industry', groups: 'industry', oil: 'industry', tyre: 'industry', inbox: 'inbox', rules: 'rules', chronicle: 'chronicle', records: 'records', track: 'records' };
 
 function parseRoute() {
   const parts = (location.hash || '#/race').replace(/^#\/?/, '').split('/');
-  return { name: parts[0] || 'race', arg: parts[1] === undefined ? null : decodeURIComponent(parts[1]) };
+  return { name: parts[0] || 'race', arg: parts[1] === undefined ? null : decodeURIComponent(parts[1]), sub: parts[2] === undefined ? null : decodeURIComponent(parts[2]), extra: parts[3] === undefined ? null : decodeURIComponent(parts[3]) };
 }
 
-function viewFor(name, arg) {
+function viewFor(name, arg, sub, extra) {
   const num = (v) => (v === null ? null : /^\d+$/.test(v) ? +v : v);
   switch (name) {
-    case 'standings': return pages.pageStandings(world);
+    case 'standings': return arg === null ? pages.pageStandings(world) : pages.pageSeasonStandings(world, +arg);
     case 'teams': return pages.pageTeams(world);
     case 'team': return pages.pageTeam(world, num(arg));
     case 'lowteam': return pages.pageLowTeam(world, num(arg));
     case 'drivers': return pages.pageDrivers(world);
     case 'driver': return pages.pageDriver(world, num(arg));
     case 'tiers': return pages.pageTiers(world);
-    case 'series': return pages.pageSeries(world, num(arg));
+    case 'series': return pages.pageSeries(world, num(arg), sub, sub === 'chronicle' ? extra : null);
     case 'industry': return pages.pageIndustry(world, world.governor.mode === 'hands' || (world.governor.manual && world.governor.manual['entry-works']));
     case 'brand': return pages.pageBrand(world, arg);
     case 'sponsor': return pages.pageSponsor(world, arg);
+    case 'group': return pages.pageGroup(world, arg);
+    case 'groups': return pages.pageGroups(world);
+    case 'oil': return pages.pageOil(world, arg);
+    case 'tyre': return pages.pageTyre(world, arg);
     case 'track': return pages.pageTrack(world, arg);
     case 'inbox': return pages.pageInbox(world);
     case 'rules': return pages.pageRules(world);
@@ -197,8 +202,8 @@ const latestYear = () => { const h = world.history.seasons.filter((x) => !x.canc
 
 function renderRoute(keepScroll) {
   if (!world) return;
-  const { name, arg } = parseRoute();
-  const tab = TAB_OF[name] || 'race';
+  const { name, arg, sub, extra } = parseRoute();
+  const tab = name === 'standings' && arg !== null ? 'chronicle' : TAB_OF[name] || 'race';
   for (const a of document.querySelectorAll('#tabs a')) a.classList.toggle('on', a.dataset.tab === tab);
   const race = tab === 'race';
   $('tab-race').hidden = !race;
@@ -206,8 +211,8 @@ function renderRoute(keepScroll) {
   if (race) { renderRaceTab(); return; }
   const y = window.scrollY;
   let html;
-  try { html = viewFor(name, arg); } catch (e) { html = `<section class="panel"><h3>This page could not be drawn</h3><div class="small">${esc(e.message)}</div></section>`; console.error(e); }
-  $('view').innerHTML = (name === 'team' || name === 'driver' || name === 'series' || name === 'brand' || name === 'sponsor' || name === 'lowteam' || name === 'track' ? '<div class="back"><a class="lk" href="javascript:history.back()">&larr; Back</a></div>' : '') + html;
+  try { html = viewFor(name, arg, sub, extra); } catch (e) { html = `<section class="panel"><h3>This page could not be drawn</h3><div class="small">${esc(e.message)}</div></section>`; console.error(e); }
+  $('view').innerHTML = (name === 'team' || name === 'driver' || name === 'series' || name === 'brand' || name === 'sponsor' || name === 'lowteam' || name === 'track' || name === 'group' || name === 'oil' || name === 'tyre' || (name === 'standings' && arg !== null) ? '<div class="back"><a class="lk" href="javascript:history.back()">&larr; Back</a></div>' : '') + html;
   if (keepScroll) window.scrollTo(0, y); else window.scrollTo(0, 0);
 }
 
@@ -322,14 +327,16 @@ function renderTiming(step, info) {
   const year = world.year;
   const showTyres = year >= 1975, showStops = year >= 1950;
   const get = (id) => info[id] || { driverName: '?', team: '?', number: '' };
+  // the running order and the retirements wear their team's colours
+  const look = (id) => { const g = get(id); if (g.teamId === undefined) return { badge: '', style: '' }; const pal = teamPalette(world, g.teamId); return { badge: teamBadge(world, g.teamId), style: `--rc:${pal[0]};--rc2:${pal[1]}` }; };
   const rows = step.order.map((o) => ({
-    cls: get(o.id).driverId === followDriver ? 'follow' : '',
-    cells: [o.pos, o.number, esc(get(o.id).driverName), esc(get(o.id).team), o.pos === 1 ? '' : gapText(o.gap, year), showStops ? o.pits : '', showTyres ? Math.round((1 - Math.min(1, o.tyreWear)) * 100) + '%' : ''],
+    cls: 'tc ' + (get(o.id).driverId === followDriver ? 'follow' : ''), style: look(o.id).style,
+    cells: [o.pos, o.number, esc(get(o.id).driverName), look(o.id).badge + esc(get(o.id).team), o.pos === 1 ? '' : gapText(o.gap, year), showStops ? o.pits : '', showTyres ? Math.round((1 - Math.min(1, o.tyreWear)) * 100) + '%' : ''],
   }));
-  for (const id of step.out) rows.push({ cls: 'out' + (get(id).driverId === followDriver ? ' follow' : ''), cells: ['', get(id).number, esc(get(id).driverName), esc(get(id).team), 'out', '', ''] });
+  for (const id of step.out) rows.push({ cls: 'tc out' + (get(id).driverId === followDriver ? ' follow' : ''), style: look(id).style, cells: ['', get(id).number, esc(get(id).driverName), look(id).badge + esc(get(id).team), 'out', '', ''] });
   const el = $('timing');
   el.innerHTML = '<thead><tr>' + ['P', 'No.', 'Driver', 'Team', 'Gap', showStops ? 'Stops' : '', showTyres ? 'Tyres' : ''].map((h, i) => `<th class="${i >= 4 ? 'num' : ''}">${h}</th>`).join('') + '</tr></thead><tbody>' +
-    rows.map((r) => `<tr class="${r.cls || ''}">` + r.cells.map((c, i) => `<td class="${i >= 4 ? 'num' : ''}">${c}</td>`).join('') + '</tr>').join('') + '</tbody>';
+    rows.map((r) => `<tr class="${r.cls || ''}"${r.style ? ` style="${r.style}"` : ''}>` + r.cells.map((c, i) => `<td class="${i >= 4 ? 'num' : ''}">${c}</td>`).join('') + '</tr>').join('') + '</tbody>';
   $('lapcount').textContent = `lap ${step.lap} of ${step.laps}` + (step.rain ? ' · raining' : '') + (step.events.some((e) => e.kind === 'safety') ? ' · safety car' : '');
 }
 
@@ -343,7 +350,7 @@ async function watch(mode) {
   const prep = prepareRound(world);
   const info = {};
   const tname = (id) => (teamById(world, id) || { name: '?' }).name;
-  for (const st of prep.setup.starters) info[st.entryId] = { number: st.number, driverName: st.driverName, driverId: st.driverId, team: tname(st.teamId) };
+  for (const st of prep.setup.starters) info[st.entryId] = { number: st.number, driverName: st.driverName, driverId: st.driverId, team: tname(st.teamId), teamId: st.teamId };
   const gen = raceGenerator(prep.setup);
   const delay = mode === 1 ? 380 : mode === 2 ? 70 : 0;
   let result = null;

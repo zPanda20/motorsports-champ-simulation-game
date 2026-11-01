@@ -6,7 +6,9 @@
 import { makeRng, clamp } from './rng.js';
 import { scoringFor, tyreRuleFor, eraFor } from './data/eras.js';
 import { regionName } from './data/regions.js';
-import { logEvent, activateWorks, addPrivateerTeam, brandById, activeEntries, deactivateTeam } from './world.js';
+import { logEvent, activateWorks, addPrivateerTeam, brandById, teamById, activeEntries, deactivateTeam } from './world.js';
+import { applyFounderDecision, graduateLowTeam, acquireTeam } from './founders.js';
+import { engineOnlyAt } from './data/brands.js';
 import { foundSeries, lowTeamById } from './tiers.js';
 import { eventsFor } from './data/events.js';
 
@@ -52,7 +54,9 @@ export function governorChoice(world, item) {
     case 'entry-works': case 'entry-team': {
       const cars = activeEntries(world).length;
       const room = clamp((world.regs.gridCap + 6 - cars) / 8, 0.05, 1);
-      return r() < 0.25 + 0.65 * g.open * room ? 'approve' : 'refuse';
+      // a champion or an established engineer with a plan, or a maker buying a team already on the grid, is a safer bet
+      const bonus = pl.founderDriverId !== undefined || pl.engineer ? 0.22 : pl.buyTeamId ? 0.3 : (pl.lowTeamId && lowFounder(world, pl.lowTeamId)) ? 0.25 : 0;
+      return r() < clamp(0.25 + 0.65 * g.open * room + bonus, 0.05, 0.97) ? 'approve' : 'refuse';
     }
     case 'series': return r() < 0.3 + 0.65 * g.tiers ? 'approve' : 'refuse';
     case 'calendar': return r() < 0.3 + 0.6 * g.growth ? 'approve' : 'refuse';
@@ -62,6 +66,8 @@ export function governorChoice(world, item) {
   }
 }
 
+const lowFounder = (world, id) => { const t = lowTeamById(world, id); return t && t.founder; };
+
 // carries out a decision
 export function applyDecision(world, item, choice, who) {
   const year = world.year;
@@ -70,11 +76,15 @@ export function applyDecision(world, item, choice, who) {
   const rng = makeRng(world.seed, 'apply', item.id, year);
   if (item.kind === 'entry-works') {
     const b = brandById(world, pl.brandId);
-    if (choice === 'approve' && b && b.status !== 'racing') { activateWorks(world, b, rng, year); logEvent(world, year, 'brand', `${b.name} enters the championship with a works team.`); }
-    else if (b) logEvent(world, year, 'brand', `The entry of ${b.name} is refused.`);
+    const target = pl.buyTeamId ? teamById(world, pl.buyTeamId) : null;
+    if (choice === 'approve' && b && b.status !== 'racing' && target && target.active && target.kind === 'privateer') acquireTeam(world, b, target, year, rng);
+    else if (choice === 'approve' && b && b.status !== 'racing') { activateWorks(world, b, rng, year); logEvent(world, year, 'brand', `${b.name} enters the championship with a works team.`); }
+    else if (b) logEvent(world, year, 'brand', `The entry of ${b.name}${target ? ' to buy ' + target.name : ''} is refused.`);
   } else if (item.kind === 'entry-team') {
     const lt = pl.lowTeamId ? lowTeamById(world, pl.lowTeamId) : null;
-    if (choice === 'approve') {
+    if (applyFounderDecision(world, pl, choice, year, rng)) { /* a founder's team: handled */ }
+    else if (choice === 'approve' && lt && lt.founder && graduateLowTeam(world, lt, year, rng)) { /* the founder's team climbs */ }
+    else if (choice === 'approve') {
       const t = addPrivateerTeam(world, rng, year, { nat: lt ? lt.nat : undefined, rich: true });
       if (lt) { t.name = lt.name; t.nat = lt.nat; t.region = lt.region; t.names = [lt.name]; lt.ended = year; lt.graduated = year; t.prestige = Math.max(t.prestige, lt.prestige); }
       logEvent(world, year, 'team', `${t.name} is granted a Tier 1 entry and must pre-qualify.`);
@@ -136,6 +146,7 @@ export function inviteBrand(world, brandId) {
   const b = brandById(world, brandId);
   if (!b || b.status === 'racing' || b.status === 'defunct') return false;
   const year = world.year;
+  if (engineOnlyAt(b.id, year)) { b.status = 'racing'; b.raceYears = 0; logEvent(world, year, 'brand', `${b.name} accepts an invitation from the governing body and begins supplying engines (your decision).`); return true; }
   activateWorks(world, b, makeRng(world.seed, 'invite', brandId, year), year);
   logEvent(world, year, 'brand', `${b.name} accepts an invitation from the governing body and enters with a works team (your decision).`);
   return true;

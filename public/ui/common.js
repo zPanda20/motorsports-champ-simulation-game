@@ -10,7 +10,7 @@ export function table(head, rows, cls = '') {
   return `<table class="${cls}"><thead><tr>` + head.map((h) => `<th class="${h.num ? 'num' : ''}">${esc(typeof h === 'object' ? h.t : h)}</th>`).join('') + '</tr></thead><tbody>' +
     rows.map((r) => {
       const cells = Array.isArray(r) ? r : r.cells;
-      return `<tr class="${Array.isArray(r) ? '' : r.cls || ''}">` + cells.map((c, i) => `<td class="${head[i] && head[i].num ? 'num' : ''}">${c}</td>`).join('') + '</tr>';
+      return `<tr class="${Array.isArray(r) ? '' : r.cls || ''}"${!Array.isArray(r) && r.style ? ` style="${esc(r.style)}"` : ''}>` + cells.map((c, i) => `<td class="${head[i] && head[i].num ? 'num' : ''}">${c}</td>`).join('') + '</tr>';
     }).join('') + '</tbody></table>';
 }
 
@@ -36,3 +36,6 @@ export const NAT = (n) => esc(n);
 export function band(v) {
   return v >= 80 ? 'exceptional' : v >= 68 ? 'very good' : v >= 56 ? 'good' : v >= 44 ? 'average' : v >= 32 ? 'poor' : 'weak';
 }
+
+// a row of links under a page title: [[href, label, on]]
+export const subtabs = (items) => '<nav class="subtabs">' + items.map(([h, l, on]) => `<a href="${h}" class="${on ? 'on' : ''}">${esc(l)}</a>`).join('') + '</nav>';

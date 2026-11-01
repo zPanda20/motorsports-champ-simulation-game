@@ -5,7 +5,10 @@
 
 import { makeRng, clamp } from './rng.js';
 import { PARAMS as P } from './params.js';
-import { BRANDS } from './data/brands.js';
+import { BRANDS, engineOnlyAt } from './data/brands.js';
+import { worksTargetFor, privTargetFor, sellOffChance, buyInChance } from './data/curve.js';
+import { corporateYear } from './corp.js';
+import { foundersYear, sellOffWorks, candidatesToBuy } from './founders.js';
 import { stability, eraFor } from './data/eras.js';
 import { eventsFor } from './data/events.js';
 import {
@@ -14,10 +17,10 @@ import {
 } from './world.js';
 import { overallAt, peakOverall, retirementChance } from './drivers.js';
 import { adoptTechs } from './techs.js';
-import { orgYear, signContract, makeOwner } from './org.js';
+import { orgYear, signContract, makeOwner, supplierDeals } from './org.js';
 import { tiersTransition, scoutEstimate } from './tiers.js';
 import { propose, governorYear, settle, traits } from './governor.js';
-import { assignTyres, developTyres, activateTeam, makeStaff, usedNames } from './world.js';
+import { assignTyres, developTyres, activateTeam, makeStaff, usedNames, ensureOils, developOils, assignOil } from './world.js';
 import { nationalityWeights as natW } from './names.js';
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
@@ -29,7 +32,10 @@ function racingBrands(world) { return world.brands.filter((b) => b.status === 'r
 function foundBrands(world, year, rng) {
   for (const def of BRANDS) {
     if (def.founded > year || brandById(world, def.id)) continue;
+    // brands made by a merger, and brands that have merged away, are handled in corp.js
+    if (def.via === 'merge' || (def.until !== undefined && def.until <= year)) continue;
     const b = newBrandObject(def, makeRng(world.seed, 'brand', def.id), year);
+    if (def.engineOnly) b.sellsCustomers = true;
     world.brands.push(b);
     if (def.founded === year) logEvent(world, year, 'brand', `${b.name} (${b.country}) is founded.`);
   }
@@ -69,15 +75,27 @@ function developBrands(world, rng, last) {
   }
 }
 
+const isEngineOnly = (b, year) => engineOnlyAt(b.id, year);
+
 function brandLifecycle(world, year, rng, ev, last) {
-  const era = eraFor(year);
-  const target = era.worksTarget;
+  const target = worksTargetFor(year);
   void last;
-  let W = racingBrands(world).length;
+  const worksBrands = () => world.brands.filter((b) => b.status === 'racing' && !isEngineOnly(b, year));
+  let W = worksBrands().length;
+  const sorted = world.brands.slice().sort((a, c) => a.id.localeCompare(c.id));
+
+  // makers that are only allowed to build engines can no longer run a works team
+  for (const b of sorted) {
+    if (!isEngineOnly(b, year)) continue;
+    const team = world.teams.find((t) => t.kind === 'works' && t.brandId === b.id && t.active);
+    if (!team) continue;
+    sellOrClose(world, team, b, year, rng.fork('eo', b.id), true);
+    logEvent(world, year, 'brand', `${b.name} closes its works team to concentrate on building engines for others.`);
+  }
 
   // exits
-  for (const b of world.brands.slice().sort((a, c) => a.id.localeCompare(c.id))) {
-    if (b.status !== 'racing') continue;
+  for (const b of sorted) {
+    if (b.status !== 'racing' || isEngineOnly(b, year)) continue;
     const r = rng.fork('exit', b.id);
     let p = (0.006 + ev.brandExit) * (0.4 + 0.6 * stability(year));
     if (b.strength < 0.38) p += 0.06;
@@ -85,41 +103,66 @@ function brandLifecycle(world, year, rng, ev, last) {
     if (b.health !== undefined && b.health < 0.3) p += 0.07;
     if (b.raceYears > 25) p *= 0.5;
     p *= 1 - Math.min(0.5, b.titles * 0.03 + b.raceYears * 0.006); // legacy buffers bad patches
-    p *= clamp(W / target, 0.6, 1.8);
-    if (W <= 3) p *= 0.2;
+    p *= clamp(W / target, 0.6, 2.2);
+    if (W > target + 1) p += 0.14 * (W - target - 1);          // the sport settles around its target
+    if (b.corp) p *= 0.8;                                      // a group stands behind its brands
+    if (W <= 2) p *= 0.2;
     if (r.next() < p) {
       b.status = 'dormant';
       const team = world.teams.find((t) => t.kind === 'works' && t.brandId === b.id && t.active);
-      if (team) deactivateTeam(world, team, year);
+      if (team) sellOrClose(world, team, b, year, r.fork('sell'), false);
+      else logEvent(world, year, 'brand', `${b.name} withdraws from the championship.`);
       W--;
-      logEvent(world, year, 'brand', `${b.name} withdraws its works team${ev.names.length ? ' (' + ev.names[0] + ')' : ''}.`);
+      if (team && team.kind === 'works') logEvent(world, year, 'brand', `${b.name} withdraws its works team${ev.names.length ? ' (' + ev.names[0] + ')' : ''}.`);
     }
   }
 
-  // entries
-  for (const b of world.brands.slice().sort((a, c) => a.id.localeCompare(c.id))) {
-    if (b.status !== 'dormant') continue;
+  // engine builders decide whether to supply the grid
+  const suppliers = () => world.brands.filter((b) => b.status === 'racing' && (b.sellsCustomers || isEngineOnly(b, year))).length;
+  for (const b of sorted) {
+    if (!isEngineOnly(b, year) || b.status === 'defunct' || b.founded > year) continue;
+    const r = rng.fork('supply', b.id);
+    const n = suppliers();
+    if (b.status === 'racing') {
+      if (n > 3 && r.chance(0.02 + (b.strength < 0.4 ? 0.05 : 0))) { b.status = 'dormant'; logEvent(world, year, 'brand', `${b.name} stops supplying engines to the championship.`); }
+    } else if (b.status === 'dormant') {
+      const p = clamp(0.3 - 0.06 * n, 0.04, 0.3) * (b.strength > 0.5 ? 1.3 : 0.8) * Math.max(0.3, ev.brandEntry);
+      if (r.chance(p) || (b.foundedInGame === year && b.founded === year && n < 4)) { b.status = 'racing'; b.raceYears = 0; logEvent(world, year, 'brand', `${b.name} begins supplying engines to the championship.`); }
+    }
+  }
+
+  // entries: a dormant maker wants in, by founding a works team or by buying an independent one
+  const wantBuy = candidatesToBuy(world, year);
+  for (const b of sorted) {
+    if (b.status !== 'dormant' || isEngineOnly(b, year)) continue;
     const r = rng.fork('enter', b.id);
     let p = 0.03 * (b.strength > 0.5 ? 1.5 : 0.6) * clamp((target - W) / 3 + 0.5, 0.1, 3) * ev.brandEntry;
     if (b.foundedInGame === year && b.founded === year) p = Math.max(p, 0.4 * ev.brandEntry);
-    if (W >= target + 3) p *= 0.1;
+    if (b.corp) p *= 1.2;
+    if (W >= target + 2) p *= 0.1;
     if (r.next() < p) {
-      propose(world, year, 'entry-works', { brandId: b.id }, `${b.name} asks to enter`, `${b.name} (${b.country}) wants to enter the championship with a works team. Strength ${Math.round(b.strength * 100)}, ${b.titles} titles in the past.`);
+      const buyable = wantBuy.filter((t) => !world.inbox.some((i) => i.status === 'pending' && i.payload && i.payload.buyTeamId === t.id));
+      if (buyable.length && r.fork('buy').chance(buyInChance(year))) {
+        const t = r.fork('which').weighted(buyable.slice(0, 6), (x) => 10 + x.prestige);
+        propose(world, year, 'entry-works', { brandId: b.id, buyTeamId: t.id }, `${b.name} asks to buy ${t.name}`, `${b.name} (${b.country}) wants to buy the independent team ${t.name} and run it as a factory effort. Strength ${Math.round(b.strength * 100)}, ${b.titles} titles in the past.`);
+      } else {
+        propose(world, year, 'entry-works', { brandId: b.id }, `${b.name} asks to enter`, `${b.name} (${b.country}) wants to enter the championship with a works team. Strength ${Math.round(b.strength * 100)}, ${b.titles} titles in the past.`);
+      }
       W++;
     }
   }
 
   // death and revival
-  for (const b of world.brands.slice().sort((a, c) => a.id.localeCompare(c.id))) {
+  for (const b of sorted) {
     const r = rng.fork('life', b.id);
     if (b.status === 'dormant') {
       const age = year - b.founded;
-      const p = age > 40 ? 0.004 : 0.01;
+      const p = (age > 40 ? 0.004 : 0.01) * (b.corp ? 0.4 : 1) * (isEngineOnly(b, year) ? 0.3 : 1);
       if (r.next() < p) {
         b.status = 'defunct'; b.defunctSince = year;
         logEvent(world, year, 'brand', `${b.name} ceases trading.`);
       }
-    } else if (b.status === 'defunct' && year - b.defunctSince >= 3) {
+    } else if (b.status === 'defunct' && !b.mergedInto && year - b.defunctSince >= 3) {
       if (r.next() < 0.004) {
         b.status = 'dormant'; b.defunctSince = null;
         b.strength = r3(clamp(0.45 + r.gauss(0, 0.1), 0.25, 0.8));
@@ -127,6 +170,15 @@ function brandLifecycle(world, year, rng, ev, last) {
       }
     }
   }
+}
+
+// a works team of a maker that is leaving: sold on, or closed
+function sellOrClose(world, team, brand, year, rng, keepRacingStatus) {
+  const sell = rng.fork('chance').chance(sellOffChance(year)) && world.teams.filter((t) => t.active).length >= 6;
+  if (sell) { sellOffWorks(world, team, brand, year, rng.fork('sale')); return true; }
+  deactivateTeam(world, team, year);
+  if (keepRacingStatus) team.closed = { year, why: 'maker became an engine supplier', peakPrestige: team.legacy.peakPrestige, peakFacilities: team.legacy.peakFacilities };
+  return false;
 }
 
 // ---------------------------------------------------------------- teams
@@ -138,7 +190,7 @@ function privateerTeams(world, year, rng, ev, last) {
   for (const t of world.teams.filter((x) => x.kind === 'privateer' && x.active)) {
     const r = rng.fork('team', t.id);
     const rank = last && last.teamRank ? last.teamRank[t.id] : 0.5;
-    t.brandId = pickSupplier(world, r.fork('supplier'), t.brandId);
+    if (!t.partner) t.brandId = pickSupplier(world, r.fork('supplier'), t.brandId);
     syncEntries(world, t, r.fork('entries'));
     const hasPartial = world.entries.some((e) => e.teamId === t.id && e.type === 'partial' && e.active);
     if (!hasPartial && era.entries.partial >= 1 && t.wealth > 0.45 && r.chance(0.08)) addEntry(world, t, 'partial', r.fork('partial'));
@@ -146,7 +198,8 @@ function privateerTeams(world, year, rng, ev, last) {
   }
 
   for (let i = 0; i < 2; i++) {
-    const p = clamp((era.privTarget - count) * 0.22 + 0.06, 0, 0.7) * ev.teamFound * stability(year) * (count >= era.privTarget + 1 ? 0.25 : 1);
+    const pt = privTargetFor(year);
+    const p = clamp((pt - count) * 0.22 + 0.06, 0, 0.7) * ev.teamFound * stability(year) * (count >= pt + 1 ? 0.25 : 1);
     const r = rng.fork('found', i);
     if (r.next() < p) {
       propose(world, year, 'entry-team', {}, 'A new team applies to enter', 'Investors want to enter a new privateer team with customer cars.');
@@ -252,6 +305,7 @@ export function industryTransition(world, year, last) {
   ensureCohorts(world, year + 16);
   applyEraRegs(world, year);
   foundBrands(world, year, rng.fork('found'));
+  corporateYear(world, year, rng.fork('corp'));
   developBrands(world, rng.fork('develop'), last);
   brandLifecycle(world, year, rng.fork('life'), ev, last);
   for (const note of adoptTechs(world, year, rng.fork('tech'))) logEvent(world, year, 'tech', note);
@@ -259,12 +313,17 @@ export function industryTransition(world, year, last) {
     ev, deactivate: deactivateTeam, addTeam: (w, r, y, opts) => addPrivateerTeam(w, r, y, opts), activate: activateTeam,
   });
   privateerTeams(world, year, rng.fork('priv'), ev, last);
+  foundersYear(world, year, rng.fork('founders'), ev, (kind, payload, title, text) => propose(world, year, kind, payload, title, text));
   const gov = traits(world);
   tiersTransition(world, year, rng.fork('tiers'), gov, (kind, payload, title, text) => propose(world, year, kind, payload, title, text));
   governorYear(world, year, last, ev);
   settle(world);
   developTyres(world, year, rng.fork('tyres'));
   assignTyres(world, rng.fork('tyre-assign'), year);
+  ensureOils(world, year);
+  developOils(world, year, rng.fork('oils'));
+  assignOil(world, rng.fork('oil-assign'), year);
+  supplierDeals(world, year); // the sponsor rows follow the deals just signed, not last year's
   driverMarket(world, year, rng.fork('drivers'), last);
   return ev;
 }

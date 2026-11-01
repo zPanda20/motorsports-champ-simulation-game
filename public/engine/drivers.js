@@ -100,7 +100,7 @@ export function makeDriverFromLegend(rng, id, leg) {
   const [lo, hi] = PARAMS.world.legendTalentRoll;
   const roll = 1 + sign * rng.float(lo, hi);
   const peak = {};
-  for (const k of STAT_KEYS) peak[k] = clamp(Math.round((leg.baseTalent + leg.bias[k]) * roll), 20, 99);
+  for (const k of STAT_KEYS) peak[k] = clamp(Math.round((leg.baseTalent + leg.bias[k]) * roll), 20, 96);
   return {
     id, name: leg.full, first: leg.first, last: leg.last, nat: leg.nat, gender: leg.gender, birthYear: leg.birthYear,
     peak, peakAge: leg.peakAge, style: Math.round(leg.style * 100) / 100,

@@ -1,0 +1,287 @@
+/* Era themes, leaning in. style.css defines each period's colours, type and edges; this file adds
+   the structural touches that make a period read at a glance (grids, geometry, window frames,
+   gloss, glitch). The Vaporwave theme is left exactly as it was. Every rule here keeps text on
+   a flat, high-contrast surface: the decoration lives in margins, borders, headings and
+   backgrounds, never behind running text. */
+
+/* ============================================================ 1919-24  De Stijl */
+/* a Mondrian composition: black rules cross the page, primary blocks sit in the corners */
+body[data-theme="destijl"] {
+  --bg2:
+    linear-gradient(#16140f, #16140f) 0 118px / 100% 5px no-repeat fixed,
+    linear-gradient(#16140f, #16140f) 22px 0 / 5px 100% no-repeat fixed,
+    linear-gradient(var(--a1), var(--a1)) 0 0 / 22px 118px no-repeat fixed,
+    linear-gradient(var(--a2), var(--a2)) 100% 100% / 15% 12% no-repeat fixed,
+    linear-gradient(var(--a3), var(--a3)) 100% 100% / 5% 30% no-repeat fixed;
+}
+body[data-theme="destijl"] header.top { padding-left: 46px; border-bottom: 5px solid #16140f; }
+body[data-theme="destijl"] main { padding-left: 46px; }
+body[data-theme="destijl"] .panel { border-width: 4px; border-radius: 0; }
+body[data-theme="destijl"] .panel::before { width: 54px; height: 14px; left: -4px; top: -4px; border: 4px solid #16140f; background: var(--a1); border-radius: 0; }
+body[data-theme="destijl"] .panel:nth-of-type(3n+2)::before { background: var(--a2); }
+body[data-theme="destijl"] .panel:nth-of-type(3n+3)::before { background: var(--a3); }
+body[data-theme="destijl"] .panel h3 { padding-top: 6px; font-size: 14px; }
+body[data-theme="destijl"] th { border-bottom-width: 4px; }
+body[data-theme="destijl"] td { border-bottom: 2px solid var(--line); }
+body[data-theme="destijl"] .tabs a { border-right-width: 3px; }
+body[data-theme="destijl"] button, body[data-theme="destijl"] select, body[data-theme="destijl"] input { border-width: 3px; }
+
+/* ============================================================ 1925-34  Bauhaus */
+/* circle, triangle and square: quarter-circle corners, a drawn grid, lower-case headings */
+body[data-theme="bauhaus"] {
+  --bg2:
+    repeating-linear-gradient(135deg, rgba(27,27,27,.045) 0 1px, transparent 1px 26px) fixed,
+    radial-gradient(circle at 96% 8%, rgba(214,54,43,.22) 0 120px, transparent 121px) fixed,
+    linear-gradient(45deg, transparent 0 88%, rgba(242,194,48,.35) 88% 100%) fixed;
+}
+body[data-theme="bauhaus"] header.top {
+  background: radial-gradient(circle at 94% 50%, var(--a1) 0 30px, transparent 31px), linear-gradient(135deg, transparent 0 93%, var(--a2) 93%), var(--bg);
+  border-bottom: 4px solid #1b1b1b;
+}
+body[data-theme="bauhaus"] .panel { border-radius: 0 44px 0 0; border-width: 3px; }
+body[data-theme="bauhaus"] .panel::before { width: 16px; height: 16px; left: 12px; top: -10px; border-radius: 50%; background: var(--a1); border: 3px solid #1b1b1b; }
+body[data-theme="bauhaus"] .panel:nth-of-type(3n+2)::before { background: var(--a2); border-radius: 0; }
+body[data-theme="bauhaus"] .panel:nth-of-type(3n+3)::before { background: #1b1b1b; border-radius: 0; transform: rotate(45deg); }
+body[data-theme="bauhaus"] .panel h3 { font-size: 16px; padding-left: 4px; }
+body[data-theme="bauhaus"] .hero { border-bottom: 4px solid #1b1b1b; }
+body[data-theme="bauhaus"] .tabs { border-radius: 0 22px 0 0; }
+body[data-theme="bauhaus"] .tabs a.on { background: var(--a1); }
+body[data-theme="bauhaus"] button, body[data-theme="bauhaus"] select { border-radius: 0 12px 0 0; }
+body[data-theme="bauhaus"] .tag { border-radius: 0 8px 0 0; }
+
+/* ============================================================ 1935-39  Constructivism */
+/* diagonals and heavy blocks: a red wedge, black bars, headings on skewed black slabs */
+body[data-theme="constructivism"] {
+  --bg2:
+    linear-gradient(112deg, transparent 0 82%, rgba(207,31,31,.92) 82% 84%, transparent 84% 85.5%, #121212 85.5% 86.5%, transparent 86.5%) fixed,
+    repeating-linear-gradient(-45deg, rgba(18,18,18,.05) 0 2px, transparent 2px 16px) fixed;
+}
+body[data-theme="constructivism"] header.top { border-bottom: 8px solid #121212; --hdr-bg: linear-gradient(100deg, #e7dfcd 0 82%, #cf1f1f 82% 85%, #e7dfcd 85% 86.5%, #121212 86.5% 88%, #cf1f1f 88%); background: var(--hdr-bg); }
+body[data-theme="constructivism"] .panel { border-width: 3px; border-left: 14px solid var(--a1); border-top: 7px solid #121212; border-radius: 0; box-shadow: 6px 6px 0 rgba(18,18,18,.85); }
+body[data-theme="constructivism"] .panel::before { display: none; }
+body[data-theme="constructivism"] .panel h3 { position: relative; z-index: 0; display: inline-block; padding: 3px 14px; margin-left: -6px; color: #f2ebdb; font-size: 14px; }
+body[data-theme="constructivism"] .panel h3::before { content: ""; position: absolute; inset: 0; z-index: -1; background: #121212; transform: skewX(-14deg); }
+body[data-theme="constructivism"] .hero h2 { font-size: 34px; letter-spacing: .02em; border-left: 12px solid var(--a1); padding-left: 12px; }
+body[data-theme="constructivism"] th { background: #121212; color: #f2ebdb; border-bottom: 0; }
+body[data-theme="constructivism"] .tabs { box-shadow: 5px 5px 0 #121212; }
+body[data-theme="constructivism"] button { box-shadow: 3px 3px 0 #121212; }
+
+/* ============================================================ 1940s  Austerity */
+/* newsprint and rationing: paper grain, typed ledger rules, stamped labels, punched corners */
+body[data-theme="austerity"] {
+  --bg2:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' seed='4'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .3 0 0 0 0 .2 0 0 0 .16 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E") fixed;
+}
+body[data-theme="austerity"] header.top { border-bottom: 6px double #2a2723; }
+body[data-theme="austerity"] .panel { border-width: 2px; border-radius: 0; outline: 1px dashed #5b5648; outline-offset: -8px; padding: 18px 20px; box-shadow: 3px 3px 0 rgba(42,39,35,.35); }
+body[data-theme="austerity"] .panel::before { width: 14px; height: 14px; left: 10px; top: 8px; border-radius: 50%; background: var(--bg); border: 2px solid #2a2723; }
+body[data-theme="austerity"] .panel h3 { padding-left: 26px; font-size: 14px; border-bottom: 3px double #2a2723; padding-bottom: 3px; margin-bottom: 10px; }
+body[data-theme="austerity"] td { border-bottom: 1px dotted #5b5648; }
+body[data-theme="austerity"] th { border-bottom: 3px double #2a2723; }
+body[data-theme="austerity"] .tag { transform: rotate(-3deg); border-color: #8a1c14; color: #8a1c14; border-width: 3px; font-weight: 700; background: transparent; }
+body[data-theme="austerity"] .tag.gold { background: transparent; color: #8a1c14; }
+body[data-theme="austerity"] .hero h2 { text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 6px; }
+body[data-theme="austerity"] button { border-style: double; border-width: 4px; }
+
+/* ============================================================ 1950s  Atomic age */
+/* boomerangs and starbursts: kidney-shaped panels, atom bullets, a sputnik in the margin */
+body[data-theme="atomic"] {
+  --bg2:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='360' height='360' viewBox='0 0 360 360'%3E%3Cpath d='M20 300 C60 190 170 150 330 170 C250 190 190 230 150 330 C110 250 70 270 20 300Z' fill='%232a9d8f' fill-opacity='.14'/%3E%3C/svg%3E") 100% 100% / 360px 360px no-repeat fixed,
+    radial-gradient(circle at 12px 12px, rgba(42,157,143,.12) 2px, transparent 3px) 0 0/28px 28px;
+}
+body[data-theme="atomic"] header.top { border-bottom: 4px solid #1f3a3d; background: linear-gradient(180deg, #fffaf0, #f3efe0); }
+body[data-theme="atomic"] .panel { border-radius: 38px 10px 38px 10px; border-width: 3px; padding: 18px 22px; }
+body[data-theme="atomic"] .panel::before { width: 30px; height: 30px; left: 14px; top: -16px; border: 0; border-radius: 0; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='-50 -50 100 100'%3E%3Cg stroke='%23e8573d' stroke-width='9' stroke-linecap='round'%3E%3Cpath d='M0 -44V44M-44 0H44M-31 -31L31 31M-31 31L31 -31'/%3E%3C/g%3E%3Ccircle r='13' fill='%23f2b134' stroke='%231f3a3d' stroke-width='5'/%3E%3C/svg%3E") center/contain no-repeat; }
+body[data-theme="atomic"] .panel h3 { padding-left: 6px; font-size: 16px; }
+body[data-theme="atomic"] .tabs { border-radius: 24px 6px 24px 6px; }
+body[data-theme="atomic"] .tabs a.on { border-radius: 0; }
+body[data-theme="atomic"] button, body[data-theme="atomic"] select { border-radius: 16px 4px 16px 4px; }
+body[data-theme="atomic"] .tag { border-radius: 12px 3px 12px 3px; }
+body[data-theme="atomic"] .hero { border-bottom: 4px dotted #2a9d8f; }
+
+/* ============================================================ 1960s  Pop and op art */
+/* halftone dots, sticker headings at a jaunty angle, hard shadows, op-art stripes */
+body[data-theme="pop"] {
+  --bg2:
+    radial-gradient(circle at 50% 50%, rgba(255,45,149,.30) 0 26%, transparent 28%) 0 0 / 18px 18px,
+    radial-gradient(circle at 50% 50%, rgba(0,163,255,.22) 0 22%, transparent 24%) 9px 9px / 18px 18px;
+}
+body[data-theme="pop"] header.top { border-bottom: 6px solid #14001f; background: linear-gradient(90deg, #ffffff 0 84%, transparent 84%), repeating-linear-gradient(90deg, #14001f 0 14px, #ffffff 14px 28px); }
+body[data-theme="pop"] .panel { border-width: 4px; border-radius: 0; box-shadow: 7px 7px 0 #14001f; }
+body[data-theme="pop"] .panel:nth-of-type(3n+2) { box-shadow: 7px 7px 0 var(--a1); }
+body[data-theme="pop"] .panel:nth-of-type(3n+3) { box-shadow: 7px 7px 0 var(--a3); }
+body[data-theme="pop"] .panel::before { width: 46px; height: 46px; left: auto; right: -14px; top: -14px; border: 4px solid #14001f; border-radius: 50%; background: repeating-radial-gradient(circle, #14001f 0 4px, var(--a2) 4px 8px); }
+body[data-theme="pop"] .panel h3 { display: inline-block; padding: 1px 12px; margin-bottom: 10px; background: var(--a2); border: 3px solid #14001f; box-shadow: 3px 3px 0 #14001f; transform: rotate(-1.4deg); font-size: 14px; }
+body[data-theme="pop"] .tabs a:nth-child(3n+1).on { background: var(--a1); }
+body[data-theme="pop"] .tabs a:nth-child(3n+2).on { background: var(--a3); }
+body[data-theme="pop"] .tabs a:nth-child(3n+3).on { background: #14001f; }
+body[data-theme="pop"] th { background: #14001f; color: #fff; border-bottom: 0; }
+body[data-theme="pop"] .tag { background: var(--a2); border-width: 3px; transform: rotate(2deg); }
+body[data-theme="pop"] .hero h2 { font-size: 34px; text-shadow: 3px 3px 0 var(--a2); }
+
+/* ============================================================ 1970s  Swiss */
+/* the grid made visible: twelve hairline columns, heavy top rules, no boxes, one red */
+body[data-theme="swiss"] {
+  --bg2: repeating-linear-gradient(90deg, rgba(227,0,15,.055) 0 1px, transparent 1px calc(100% / 12)) fixed;
+}
+body[data-theme="swiss"] header.top { border-bottom: 3px solid #111; }
+body[data-theme="swiss"] .brand h1 { font-size: 30px; letter-spacing: -.03em; }
+body[data-theme="swiss"] .b-red { border-radius: 50%; width: 34px; }
+body[data-theme="swiss"] .b-yellow { display: none; }
+body[data-theme="swiss"] .b-blue { background: #111; width: 14px; }
+body[data-theme="swiss"] .panel { border: 0; border-top: 6px solid #111; border-radius: 0; background: transparent; box-shadow: none; padding: 12px 0 8px; backdrop-filter: none; }
+body[data-theme="swiss"] .panel::before { width: 72px; height: 6px; left: 0; top: -6px; background: var(--a1); border: 0; border-radius: 0; }
+body[data-theme="swiss"] .panel h3 { font-size: 22px; letter-spacing: -.02em; margin-bottom: 10px; }
+body[data-theme="swiss"] .hero h2 { font-size: 44px; letter-spacing: -.035em; line-height: 1; }
+body[data-theme="swiss"] table { border-top: 1px solid #111; }
+body[data-theme="swiss"] th { border-bottom: 1px solid #111; color: #111; }
+body[data-theme="swiss"] td { border-bottom: 1px solid #e4e4e4; }
+body[data-theme="swiss"] .tabs { border: 0; border-bottom: 3px solid #111; box-shadow: none; border-radius: 0; width: 100%; }
+body[data-theme="swiss"] .tabs a { border-right: 0; padding: 8px 16px 8px 0; margin-right: 8px; font-weight: 500; }
+body[data-theme="swiss"] .tabs a.on { background: transparent; color: var(--a1); box-shadow: inset 0 -5px 0 var(--a1); }
+body[data-theme="swiss"] .item, body[data-theme="swiss"] .scroll { background: #fff; }
+body[data-theme="swiss"] .hero { border-bottom: 0; }
+
+/* ============================================================ 1980s  PC-98 */
+/* every panel is a window: a title bar, a bevelled frame, a hard drop shadow, scanlines */
+body[data-theme="pc98"] header.top { border-bottom: 3px double #00e5ff; }
+body[data-theme="pc98"] .panel { border: 2px solid #00e5ff; border-radius: 0; padding-top: 0; box-shadow: 5px 5px 0 #000008, inset 0 0 0 2px #05051a, inset 0 0 0 3px #1d2358; }
+body[data-theme="pc98"] .panel::before { display: none; }
+body[data-theme="pc98"] .panel > h3:first-child, body[data-theme="pc98"] .panel > h3 { margin: 0 -16px 12px; padding: 4px 12px; background: repeating-linear-gradient(90deg, #00e5ff 0 4px, #1fb7e0 4px 8px); color: #05051a; text-shadow: none; border-bottom: 2px solid #05051a; font-size: 13px; }
+body[data-theme="pc98"] .panel > h3::before { content: "■ "; color: #ff3df0; text-shadow: 1px 1px 0 #05051a; }
+body[data-theme="pc98"] .hero { border-bottom: 3px double #00e5ff; }
+body[data-theme="pc98"] .hero h2 { color: #3dff7a; text-shadow: 2px 2px 0 #ff3df0; }
+body[data-theme="pc98"] th { color: #00e5ff; border-bottom: 2px solid #ff3df0; }
+body[data-theme="pc98"] td { border-bottom: 1px dotted #1d2358; }
+body[data-theme="pc98"] button, body[data-theme="pc98"] select, body[data-theme="pc98"] a.btnlink { box-shadow: inset -2px -2px 0 #00005a, inset 2px 2px 0 #5a6cff; }
+body[data-theme="pc98"] .tabs { box-shadow: 4px 4px 0 #000008; border-radius: 0; }
+body[data-theme="pc98"] .tag { border-radius: 0; color: #3dff7a; border-color: #3dff7a; }
+body[data-theme="pc98"] .meter { background: #1d2358; border-radius: 0; }
+body[data-theme="pc98"] .meter > span { background: repeating-linear-gradient(90deg, #3dff7a 0 6px, #05051a 6px 8px); }
+
+/* ============================================================ 2000s  Y2K */
+/* gel and gloss: glassy panel tops, aqua pill titles, bubbles in the corners, striped tables */
+body[data-theme="y2k"] {
+  --bg2:
+    radial-gradient(circle at 6% 14%, rgba(255,255,255,.95) 0 34px, rgba(26,163,232,.14) 35px 38px, transparent 39px) fixed,
+    radial-gradient(circle at 94% 32%, rgba(255,255,255,.9) 0 56px, rgba(26,163,232,.12) 57px 61px, transparent 62px) fixed,
+    radial-gradient(circle at 88% 92%, rgba(255,255,255,.9) 0 24px, rgba(126,217,87,.25) 25px 28px, transparent 29px) fixed,
+    linear-gradient(180deg, #a9e1ff 0%, #f4fbff 38%, #e4f6ff 100%) fixed;
+}
+body[data-theme="y2k"] header.top { background: linear-gradient(180deg, #ffffff 0%, #cfe9f7 52%, #b5dcf2 52%, #d7eefa 100%); border-bottom: 1px solid #6cb8e0; box-shadow: 0 3px 10px rgba(26,163,232,.25); }
+body[data-theme="y2k"] .panel { border-radius: 18px; background: linear-gradient(180deg, #ffffff 0, #f3faff 36px, #eaf6ff 100%); box-shadow: 0 3px 10px rgba(26,163,232,.22), inset 0 1px 0 #ffffff; }
+body[data-theme="y2k"] .panel::before { display: none; }
+body[data-theme="y2k"] .panel h3 { display: inline-block; padding: 3px 18px; margin-bottom: 10px; border-radius: 999px; color: #0b2a44; background: linear-gradient(180deg, #dff4ff 0 48%, #8fd6ff 50% 100%); border: 1px solid #4aa8d8; box-shadow: 0 1px 3px rgba(26,163,232,.35), inset 0 1px 0 #ffffff; text-shadow: 0 1px 0 rgba(255,255,255,.7); font-size: 14px; }
+body[data-theme="y2k"] tbody tr:nth-child(even):not(.tc) td { background: rgba(26,163,232,.07); }
+body[data-theme="y2k"] th { color: #12304a; border-bottom: 2px solid #6cb8e0; }
+body[data-theme="y2k"] .tabs { border-radius: 999px; box-shadow: 0 2px 8px rgba(26,163,232,.25); }
+body[data-theme="y2k"] .tabs a.on { background: linear-gradient(180deg, #8fd6ff 0 48%, #1aa3e8 50% 100%); color: #06223a; text-shadow: 0 1px 0 rgba(255,255,255,.55); }
+body[data-theme="y2k"] button { border-radius: 999px; box-shadow: inset 0 1px 0 #fff, 0 1px 3px rgba(26,163,232,.35); }
+body[data-theme="y2k"] button.primary { color: #06223a; background: linear-gradient(180deg, #bff0ff 0 48%, #4fc1f7 50% 100%); }
+body[data-theme="y2k"] .hero { border-bottom: 3px solid #6cb8e0; }
+body[data-theme="y2k"] .tag { border-radius: 999px; background: linear-gradient(180deg, #ffffff, #cfe9f7); }
+
+/* ============================================================ 2010-14  Memphis revival */
+/* confetti and squiggles: thick outlines, panel shadows in rotating colours, wavy rules */
+body[data-theme="memphis"] {
+  --bg2:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cpath d='M20 40 l22 -34 l22 34z' fill='%23ffd23f' fill-opacity='.7' stroke='%23111' stroke-opacity='.4' stroke-width='3' stroke-linejoin='round'/%3E%3Cpath d='M130 30 q10 -16 20 0 t20 0 t20 0' fill='none' stroke='%2300c2b2' stroke-opacity='.7' stroke-width='5' stroke-linecap='round'/%3E%3Ccircle cx='60' cy='150' r='13' fill='none' stroke='%23ff5ea8' stroke-opacity='.7' stroke-width='5'/%3E%3Crect x='150' y='140' width='28' height='28' fill='%2300c2b2' fill-opacity='.6' stroke='%23111' stroke-opacity='.4' stroke-width='3' transform='rotate(18 164 154)'/%3E%3Cpath d='M105 190 l10 -16 l10 16z' fill='%23ff5ea8' fill-opacity='.7' stroke='%23111' stroke-opacity='.4' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E") 0 0 / 220px 220px,
+    radial-gradient(#ff5ea8 2px, transparent 2.5px) 0 0/26px 26px, radial-gradient(#00c2b2 2px, transparent 2.5px) 13px 13px/26px 26px;
+}
+body[data-theme="memphis"] header.top { background: #fff; border-bottom: 5px solid #111; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='14'%3E%3Cpath d='M0 7 q7.5 -10 15 0 t15 0 t15 0 t15 0' fill='none' stroke='%23ff5ea8' stroke-width='4'/%3E%3C/svg%3E"); background-repeat: repeat-x; background-position: 0 100%; padding-bottom: 22px; }
+body[data-theme="memphis"] .tabs, body[data-theme="memphis"] .back { background: #ffffff; }
+body[data-theme="memphis"] .back { display: inline-block; padding: 1px 10px; border: 2px solid #111; margin-bottom: 14px; }
+body[data-theme="memphis"] .panel { border-width: 4px; border-radius: 0; box-shadow: 7px 7px 0 #111; }
+body[data-theme="memphis"] .panel:nth-of-type(3n+2) { box-shadow: 7px 7px 0 var(--a1); }
+body[data-theme="memphis"] .panel:nth-of-type(3n+3) { box-shadow: 7px 7px 0 var(--a2); }
+body[data-theme="memphis"] .panel::before { width: 0; height: 0; left: 18px; top: -26px; border: 0; border-left: 16px solid transparent; border-right: 16px solid transparent; border-bottom: 24px solid var(--a3); background: none; filter: drop-shadow(0 -3px 0 #111); }
+body[data-theme="memphis"] .panel h3 { display: inline-block; padding-bottom: 4px; margin-bottom: 8px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='8'%3E%3Cpath d='M0 4 q3 -4 6 0 t6 0 t6 0 t6 0' fill='none' stroke='%23ff5ea8' stroke-width='3'/%3E%3C/svg%3E") repeat-x 0 100%; }
+body[data-theme="memphis"] .tabs a:nth-child(4n+1).on { background: var(--a1); }
+body[data-theme="memphis"] .tabs a:nth-child(4n+2).on { background: var(--a2); }
+body[data-theme="memphis"] .tabs a:nth-child(4n+3).on { background: var(--a3); color: #111; }
+body[data-theme="memphis"] .tabs a:nth-child(4n+4).on { background: #111; }
+body[data-theme="memphis"] th { border-bottom: 4px solid var(--a2); }
+body[data-theme="memphis"] .tag { border-width: 3px; border-radius: 999px; background: var(--a3); }
+
+/* ============================================================ 2015-19  Duotone */
+/* gradient glass: big colour fields, halftone in the header, gradient titles, pill controls */
+body[data-theme="duotone"] {
+  --bg2:
+    radial-gradient(circle at 86% 6%, rgba(255,122,168,.45), transparent 36%) fixed,
+    radial-gradient(circle at 6% 94%, rgba(138,164,255,.40), transparent 38%) fixed,
+    linear-gradient(135deg, #1b1464 0%, #7a2a8f 55%, #e8336d 100%) fixed;
+}
+body[data-theme="duotone"] header.top { background-image: radial-gradient(rgba(255,255,255,.16) 1px, transparent 1.6px); background-size: 7px 7px; background-color: rgba(0,0,0,.22); border-bottom: 0; box-shadow: 0 1px 0 rgba(255,255,255,.2), 0 8px 24px rgba(0,0,0,.25); }
+body[data-theme="duotone"] .panel { border-radius: 22px; border: 1px solid rgba(255,255,255,.25); background: linear-gradient(rgba(255,255,255,.08), rgba(255,255,255,.08)), rgba(28,8,70,.38); box-shadow: 0 10px 30px rgba(10,0,40,.35), inset 0 1px 0 rgba(255,255,255,.25); overflow: hidden; }
+body[data-theme="duotone"] .panel::before { left: 0; top: 0; width: 100%; height: 4px; border: 0; border-radius: 0; background: linear-gradient(90deg, #ff7aa8, #8aa4ff); }
+body[data-theme="duotone"] .panel h3 { font-size: 16px; background: linear-gradient(90deg, #ffe3ec, #c9d4ff); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; padding-top: 4px; }
+body[data-theme="duotone"] .hero h2 { font-size: 32px; background: linear-gradient(90deg, #fff, #ffd1e0 60%, #c9d4ff); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; }
+body[data-theme="duotone"] .tabs { border-radius: 999px; border-width: 1px; background: rgba(0,0,0,.2); }
+body[data-theme="duotone"] .tabs a { border-right-width: 0; padding: 8px 15px; }
+body[data-theme="duotone"] button, body[data-theme="duotone"] select, body[data-theme="duotone"] a.btnlink { border-radius: 999px; border-width: 1px; }
+body[data-theme="duotone"] th { color: #ffd1e0; border-bottom: 1px solid rgba(255,255,255,.4); }
+body[data-theme="duotone"] td { border-bottom: 1px solid rgba(255,255,255,.12); }
+body[data-theme="duotone"] .tag { border-radius: 999px; border-width: 1px; }
+
+/* ============================================================ 2020s  Tech */
+/* a heads-up display: faint graph paper, corner brackets on every panel, mono numerals */
+body[data-theme="tech"] {
+  --bg2:
+    linear-gradient(rgba(102,204,255,.045) 1px, transparent 1px) 0 0 / 36px 36px fixed,
+    linear-gradient(90deg, rgba(102,204,255,.045) 1px, transparent 1px) 0 0 / 36px 36px fixed,
+    radial-gradient(ellipse at 50% -10%, rgba(102,204,255,.12), transparent 55%) fixed;
+}
+body[data-theme="tech"] header.top { border-bottom: 1px solid #2a3447; box-shadow: 0 1px 0 rgba(102,204,255,.25); }
+body[data-theme="tech"] .panel { border: 1px solid #232c3b; border-radius: 4px; background: linear-gradient(180deg, rgba(27,35,48,.95), rgba(20,25,34,.95)); box-shadow: none; }
+body[data-theme="tech"] .panel::before { left: -1px; top: -1px; width: 16px; height: 16px; border: 0; border-left: 2px solid var(--a1); border-top: 2px solid var(--a1); border-radius: 0; background: none; }
+body[data-theme="tech"] .panel::after { content: ""; position: absolute; right: -1px; bottom: -1px; width: 16px; height: 16px; border-right: 2px solid var(--a2); border-bottom: 2px solid var(--a2); pointer-events: none; }
+body[data-theme="tech"] .panel h3 { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--a1); }
+body[data-theme="tech"] .panel h3::before { content: "● "; color: #5df0b4; font-size: 9px; vertical-align: 2px; }
+body[data-theme="tech"] td.num, body[data-theme="tech"] .small b { font-family: ui-monospace, "SF Mono", Consolas, monospace; }
+body[data-theme="tech"] .hero h2 { font-weight: 600; letter-spacing: -.01em; font-size: 30px; }
+body[data-theme="tech"] .tabs { border-radius: 4px; }
+body[data-theme="tech"] .tabs a.on { box-shadow: 0 0 14px rgba(102,204,255,.5); }
+body[data-theme="tech"] button, body[data-theme="tech"] select { border-radius: 4px; border-width: 1px; }
+body[data-theme="tech"] tr:hover td { background: rgba(102,204,255,.07); }
+
+/* ============================================================ 2030s  Acid */
+/* loud and unstable: chromatic-aberration headings, glowing frames, acid table heads, blobs */
+body[data-theme="acid"] {
+  --bg2:
+    radial-gradient(ellipse at 94% 4%, rgba(255,43,214,.30), transparent 42%) fixed,
+    radial-gradient(ellipse at 2% 88%, rgba(0,240,255,.20), transparent 40%) fixed,
+    repeating-linear-gradient(135deg, rgba(198,255,0,.05) 0 2px, transparent 2px 22px) fixed;
+}
+body[data-theme="acid"] header.top { border-bottom: 4px solid #c6ff00; box-shadow: 0 6px 0 #000, 0 7px 0 #ff2bd6; }
+body[data-theme="acid"] .brand h1, body[data-theme="acid"] .hero h2 { text-shadow: 2px 0 #ff2bd6, -2px 0 #00f0ff; }
+body[data-theme="acid"] .panel { border-width: 2px; box-shadow: 0 0 0 1px #000, 0 0 22px rgba(198,255,0,.32); }
+body[data-theme="acid"] .panel:nth-of-type(3n+2) { border-color: #ff2bd6; box-shadow: 0 0 0 1px #000, 0 0 22px rgba(255,43,214,.35); }
+body[data-theme="acid"] .panel:nth-of-type(3n+3) { border-color: #00f0ff; box-shadow: 0 0 0 1px #000, 0 0 22px rgba(0,240,255,.30); }
+body[data-theme="acid"] .panel::before { width: 46px; height: 12px; background: #c6ff00; border: 0; border-radius: 0 12px 12px 0; left: -2px; top: 14px; }
+body[data-theme="acid"] .panel h3 { font-size: 16px; padding-left: 30px; text-shadow: 1.5px 0 #ff2bd6, -1.5px 0 #00f0ff; }
+body[data-theme="acid"] th { background: #c6ff00; color: #000; border-bottom: 0; padding: 6px 8px; }
+body[data-theme="acid"] td { border-bottom: 1px solid #223018; }
+body[data-theme="acid"] .tabs { border-radius: 22px 4px 22px 4px; box-shadow: 0 0 16px rgba(198,255,0,.35); }
+body[data-theme="acid"] button { border-radius: 14px 3px 14px 3px; }
+body[data-theme="acid"] .tag { border-radius: 10px 2px 10px 2px; }
+body[data-theme="acid"] a.lk { text-decoration-color: #ff2bd6; text-decoration-thickness: 2px; }
+
+/* ============================================================ readability fixes to the base palettes */
+/* active-tab text on the original tab colours fell short of 4.5:1; the shifts are barely visible */
+body[data-theme="vaporwave"] { --tab-on-bg: #8350f5; }
+body[data-theme="atomic"] { --tab-on-bg: #1e7b70; }
+body[data-theme="memphis"] .tabs a.on { color: #111111; }
+body[data-theme="memphis"] .tabs a:nth-child(4n+4).on { color: #ffffff; }
+
+/* ============================================================ branded pages, last so they win */
+body .branded .panel { border-top: 5px solid var(--c1); }
+body .branded .panel::before { background: var(--c2); }
+body[data-theme="pc98"] .branded .panel { border-top: 2px solid #00e5ff; }
+body[data-theme="swiss"] .branded .panel { border-top: 6px solid var(--c1); }
+body[data-theme="duotone"] .branded .panel::before { background: linear-gradient(90deg, var(--c1), var(--c2)); }
+body[data-theme="tech"] .branded .panel::before { background: none; border-color: var(--c1); }
+body[data-theme="destijl"] .branded .hero, body[data-theme="swiss"] .branded .hero, body[data-theme="pop"] .branded .hero, body[data-theme="duotone"] .branded .hero { border-radius: 0; }
+body .branded .hero h2 { background: none; -webkit-background-clip: border-box; background-clip: border-box; color: var(--ci); }
+body[data-theme="constructivism"] .branded .hero h2, body[data-theme="swiss"] .branded .hero h2 { color: var(--ci); }
+body[data-theme="pc98"] .branded .hero h2, body[data-theme="acid"] .branded .hero h2, body[data-theme="pop"] .branded .hero h2 { color: var(--ci); text-shadow: none; }

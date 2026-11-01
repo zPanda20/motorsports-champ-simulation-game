@@ -31,8 +31,11 @@ function driverIndex(d, T) {
   let s = 0, w = 0;
   for (const [v, k] of parts) { s += v * k; w += k; }
   const raw = s / w;
-  // the very best are only so much faster than the very good: diminishing returns above 72
-  return raw > 72 ? 72 + (raw - 72) * 0.6 : raw;
+  // the very best are only so much faster than the very good: diminishing returns above 72,
+  // and a second, steeper bend above 82 so one all-time great cannot win every title for fifteen years
+  if (raw <= 72) return raw;
+  if (raw <= 82) return 72 + (raw - 72) * 0.6;
+  return 78 + (raw - 82) * 0.35;
 }
 
 function carIndex(car, T) {

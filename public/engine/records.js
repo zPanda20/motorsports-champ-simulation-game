@@ -60,12 +60,19 @@ export function trackHistory(world, trackId) {
   return out;
 }
 
-// a driver's seasons in the top series, from the season records
+// a driver's seasons in the top series, from the season records, with the team (or teams) for each year
 export function driverSeasons(world, driverId) {
   const out = [];
   for (const h of seasons(world)) {
     const f = h.final && h.final.drivers.find((r) => r.id === driverId);
-    if (f) out.push({ year: h.year, pos: h.final.drivers.indexOf(f) + 1, pts: f.pts, wins: f.wins, podiums: f.podiums, poles: f.poles, champion: h.champion.id === driverId });
+    if (!f) continue;
+    let teamIds = f.teamIds ? f.teamIds.map(Number) : f.teamId !== undefined && f.teamId !== null ? [+f.teamId] : [];
+    if (!teamIds.length) { // older saves: read it from the team histories
+      for (const t of world.teams) if ((t.history || []).some((x) => x.year === h.year && (x.entries || []).some((e) => e.driverId === driverId))) teamIds.push(t.id);
+    }
+    const main = f.teamId !== undefined && f.teamId !== null ? +f.teamId : teamIds[0];
+    const names = teamIds.map((id) => { const r = (h.final.teams || []).find((x) => String(x.id) === String(id)); return r ? r.name : undefined; });
+    out.push({ year: h.year, pos: h.final.drivers.indexOf(f) + 1, pts: f.pts, wins: f.wins, podiums: f.podiums, poles: f.poles, champion: h.champion.id === driverId, teamId: main === undefined ? null : main, teamIds, teamNames: names, brandId: f.brandId || null });
   }
   return out;
 }

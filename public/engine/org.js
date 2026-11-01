@@ -6,6 +6,8 @@ import { makeRng, clamp } from './rng.js';
 import { makePersonName, makeTeamName, nationalityWeights } from './names.js';
 import { sponsorsOpenIn, SPONSOR_BY_ID, COMMERCIAL_FROM } from './data/sponsors.js';
 import { regionOf } from './data/regions.js';
+import { OIL_FROM, OIL_BY_ID, oilNameAt } from './data/oils.js';
+import { programmeOf } from './corp.js';
 import { stability, eraFor } from './data/eras.js';
 import { overallAt } from './drivers.js';
 import { usedNames, logEvent, brandById, teamById, driverById, activeEntries } from './world.js';
@@ -136,9 +138,35 @@ function attractiveness(team, sp, rank, year) {
   return Math.max(1, a);
 }
 
+// The oil and tyre suppliers of every team double as its sponsors, so the same company is
+// never a supplier and a sponsor separately, and no rival can sponsor the team.
+export function supplierDeals(world, year) {
+  const base = budgetBase(year);
+  const scale = year >= COMMERCIAL_FROM ? 1 : 0.3;
+  for (const t of world.teams.filter((x) => x.active)) {
+    const old = t.sponsors || [];
+    const keep = old.filter((d) => !d.supplier);
+    if (year < OIL_FROM) { t.sponsors = keep; continue; }
+    const out = [];
+    const oil = t.oilId ? OIL_BY_ID[t.oilId] : null;
+    if (oil) {
+      const prev = old.find((d) => d.supplier === 'oil' && d.supplierId === oil.id);
+      out.push({ id: oil.sponsorId || 'oil:' + oil.id, name: oilNameAt(oil, year), value: Math.round(oil.size * 0.1 * base * (0.6 + t.prestige / 200) * scale / 1000) * 1000, since: prev ? prev.since : year, until: t.oilUntil || year, supplier: 'oil', supplierId: oil.id });
+    }
+    const ty = t.tyreId ? world.tyres.find((m) => m.id === t.tyreId) : null;
+    if (ty) {
+      const prev = old.find((d) => d.supplier === 'tyres' && d.supplierId === ty.id);
+      out.push({ id: 'tyre:' + ty.id, name: ty.name, value: Math.round(0.055 * base * (0.6 + t.prestige / 200) * scale / 1000) * 1000, since: prev ? prev.since : year, until: year, supplier: 'tyres', supplierId: ty.id });
+    }
+    t.sponsors = keep.concat(out);
+  }
+}
+
 function sponsorMarket(world, year, rng, rank) {
+  for (const t of world.teams) if (t.sponsors) t.sponsors = t.sponsors.filter((d) => !d.supplier);
   if (year < COMMERCIAL_FROM) {
     for (const t of world.teams) t.sponsors = [];
+    supplierDeals(world, year);
     return;
   }
   const open = sponsorsOpenIn(year);
@@ -184,6 +212,7 @@ function sponsorMarket(world, year, rng, rank) {
       logEvent(world, year, 'sponsor', `${sp.name} becomes title sponsor of the championship.`);
     } else if (ts && ts.until < year) world.titleSponsor = null;
   }
+  supplierDeals(world, year);
 }
 
 // a marquee sponsor can bankroll a rising driver
@@ -256,7 +285,12 @@ function financeYear(world, year, rng, ts, rank) {
     const ents = activeEntries(world).filter((e) => e.teamId === t.id);
     const prize = ((pool + titleIncome) * shares[i]) / shareSum;
     const spons = t.sponsors.reduce((a, d) => a + d.value, 0);
-    const mfr = t.kind === 'works' ? base * (0.3 + 0.8 * b.strength) * (b.commitment === undefined ? 1 : b.commitment) : 0;
+    let mfr = t.kind === 'works' ? base * (0.3 + 0.8 * b.strength) * (b.commitment === undefined ? 1 : b.commitment) : 0;
+    // the engine maker backs a preferred partner almost like a works team
+    if (t.kind !== 'works' && t.partner && t.partner.preferred) mfr = base * (0.12 + 0.3 * b.strength) * (b.commitment === undefined ? 1 : b.commitment);
+    // sisters in a group that share parts save money
+    const prog = t.kind === 'works' ? programmeOf(world, t.brandId) : null;
+    if (prog) mfr += base * (prog.quality >= 0 ? 0.04 : 0.015);
     const supply = t.kind === 'works' ? (custCount[t.brandId] || 0) * base * 0.28 : 0;
     const income = prize + spons + mfr + supply;
 

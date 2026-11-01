@@ -14,6 +14,12 @@ import { beginSeason } from '../public/engine/season.js';
 import { pendingItems, resolveItem, settleAll, setRegulation } from '../public/engine/governor.js';
 import { activeSeries, seriesTier } from '../public/engine/tiers.js';
 import { titleTables, pointsToWin } from '../public/engine/records.js';
+import { BRAND_DEF, engineOnlyAt } from '../public/engine/data/brands.js';
+import { OILS, OIL_FROM, SUPPLIER_SPONSOR_IDS } from '../public/engine/data/oils.js';
+import { worksTargetFor } from '../public/engine/data/curve.js';
+import { GROUPS, groupName, groupOfBrand, MERGERS } from '../public/engine/data/corp.js';
+import { activeProgrammes } from '../public/engine/corp.js';
+import { brandPalette, teamPalette, inkOn, contrast } from '../public/ui/colors.js';
 import * as pages from '../public/ui/pages.js';
 
 let passed = 0, failed = 0;
@@ -239,9 +245,9 @@ test('season: several years roll over cleanly and stay deterministic', () => {
 // ---- golden results: the same on every machine and browser ----
 test('golden: world and season results match the pinned values', () => {
   const w = createWorld({ seed: 'golden' });
-  eq(hashString(JSON.stringify(w)), 'cf4925ef', 'world creation changed (update pin only if intended)');
+  eq(hashString(JSON.stringify(w)), '7037dded', 'world creation changed (update pin only if intended)');
   runSeason(w);
-  eq(hashString(JSON.stringify(w.season)), '397b5d3a', 'race simulation changed (update pin only if intended)');
+  eq(hashString(JSON.stringify(w.season)), 'c582d484', 'race simulation changed (update pin only if intended)');
 });
 
 // ---- saves ----
@@ -270,11 +276,39 @@ test('save: a 20-season save stays a reasonable size', () => {
 });
 
 // ---- long-run behaviour (slice 2) ----
+// what must hold in every season of a long run (slice 4): who is allowed to field a works team,
+// that every team has engines and an oil and tyre deal, and that suppliers are never also rival sponsors
+function auditYear(w, a) {
+  const y = w.year;
+  const act = w.teams.filter((t) => t.active && t.scope === 'global');
+  a.worksByYear[y] = act.filter((t) => t.kind === 'works').length;
+  for (const t of act) {
+    const b = w.brands.find((x) => x.id === t.brandId);
+    if (!b || b.status !== 'racing') a.deadBrand.push(`${y} ${t.name} (${t.brandId})`);
+    if (t.kind === 'works' && engineOnlyAt(t.brandId, y)) a.engineOnlyWorks.push(`${y} ${t.name}`);
+    if (t.kind === 'privateer' && engineOnlyAt(t.brandId, y)) a.engineOnlySupplied.add(t.brandId);
+    const oil = (t.sponsors || []).filter((d) => d.supplier === 'oil');
+    const tyre = (t.sponsors || []).filter((d) => d.supplier === 'tyres');
+    if (y < OIL_FROM && (oil.length || tyre.length || t.oilId)) a.early.push(`${y} ${t.name}`);
+    if (y > OIL_FROM) {
+      if (oil.length !== 1) a.oilMissing.push(`${y} ${t.name} has ${oil.length} oil deals`);
+      else if (oil[0].supplierId !== t.oilId) a.oilStale.push(`${y} ${t.name}: ${oil[0].supplierId} vs ${t.oilId}`);
+      if (t.tyreId && tyre.length === 1 && tyre[0].supplierId !== t.tyreId) a.oilStale.push(`${y} ${t.name}: tyres ${tyre[0].supplierId} vs ${t.tyreId}`);
+      if (tyre.length > 1) a.oilMissing.push(`${y} ${t.name} has ${tyre.length} tyre deals`);
+    }
+    for (const d of t.sponsors || []) if (SUPPLIER_SPONSOR_IDS.has(d.id) && !d.supplier) a.conflict.push(`${y} ${t.name}: ${d.id}`);
+  }
+}
+
 function century(seed, years) {
   const w = createWorld({ seed });
-  const seen = { titleBrands: new Set(), empty: 0, starts: 0, women: 0, racing: new Set() };
+  const seen = {
+    titleBrands: new Set(), empty: 0, starts: 0, women: 0, racing: new Set(),
+    audit: { worksByYear: {}, deadBrand: [], engineOnlyWorks: [], engineOnlySupplied: new Set(), early: [], oilMissing: [], oilStale: [], conflict: [] },
+  };
   for (let i = 0; i < years; i++) {
     const rounds = runSeason(w);
+    auditYear(w, seen.audit);
     if (!rounds.length) seen.empty++;
     for (const { result } of rounds) for (const r of result.classification) { seen.starts++; if (driverById(w, r.driverId).gender === 'F') seen.women++; }
     const rec = advanceYear(w);
@@ -437,6 +471,209 @@ test('save: a version 2 save (no org, tiers or governor) is upgraded and plays o
   assert(loaded.teams.every((t) => t.finance && t.facilities));
   runSeason(loaded); advanceYear(loaded); runSeason(loaded);
   assert(pages.pageTeam(loaded, loaded.teams[0].id).length > 500);
+});
+
+// ---- slice 4: corporate history, works teams, founders, oil, colours ----
+const AUD = LONG.seen.audit;
+const badHtml = (html) => /undefined|NaN|\[object/.test(html);
+
+test('slice 4: Ferrari and McLaren are gone, as brands and as team names', () => {
+  assert(!BRAND_DEF.ferrari && !BRAND_DEF.mclaren, 'still defined');
+  const w = createWorld({ seed: 'no-ferrari' });
+  for (const w2 of [w, LONG.w]) {
+    assert(!w2.brands.some((b) => /ferrari|mclaren/i.test(b.id + b.name)), 'a maker is still in the save');
+    assert(!w2.teams.some((t) => /ferrari|mclaren/i.test(t.name)), 'a team is still named after them');
+  }
+});
+test('slice 4: the works count follows the sport\'s shape', () => {
+  const t = worksTargetFor;
+  const avg = (a, b) => { let s = 0; for (let y = a; y <= b; y++) s += t(y); return s / (b - a + 1); };
+  assert(avg(1925, 1939) >= 6, 'plentiful before the war');
+  assert(avg(1960, 1979) <= 2.5, 'only a couple from the 60s to the 70s');
+  assert(avg(1984, 1990) > avg(1970, 1976), 'slight growth in the 80s');
+  assert(avg(1996, 2000) < avg(1986, 1990), 'a decrease in the 90s');
+  assert(avg(2005, 2008) > avg(1996, 2000) + 2, 'growth in the 2000s');
+  assert(avg(2010, 2013) < avg(2005, 2008) - 2, 'the 2008 crash');
+  assert(avg(2018, 2026) > avg(2010, 2013) + 3, 'makers come back from 2014');
+});
+test('slice 4: a real run keeps close to the works curve', () => {
+  const wy = AUD.worksByYear;
+  let far = 0;
+  for (const y of Object.keys(wy)) if (Math.abs(wy[y] - worksTargetFor(+y)) > 3) far++;
+  assert(far <= 3, far + ' seasons are more than 3 works teams away from the curve');
+  const mean = (a, b) => { let s = 0, n = 0; for (let y = a; y <= b; y++) if (wy[y] !== undefined) { s += wy[y]; n++; } return s / Math.max(1, n); };
+  assert(mean(1930, 1939) > mean(1960, 1979) + 2, 'works teams should be much rarer after the war');
+  assert(mean(2018, 2024) > mean(2010, 2013) + 1.5, 'the 2014 to 2017 wave of buy-ins did not show');
+});
+test('slice 4: Daimler-Benz (1926), Auto Union (1932) and Audi NSU Auto Union (1969) form on the real dates', () => {
+  const w = LONG.w;
+  const said = (year, re) => w.chronicle.some((e) => e.year === year && re.test(e.text));
+  assert(said(1926, /Daimler-Benz/), 'no 1926 merger in the chronicle');
+  assert(said(1932, /Auto Union/), 'no 1932 merger in the chronicle');
+  assert(said(1969, /NSU/), 'no 1969 merger in the chronicle');
+  const b = (id) => w.brands.find((x) => x.id === id);
+  for (const id of ['daimler', 'benz']) eq(b(id).mergedInto, 'mercedes', id + ' merged into');
+  for (const id of ['audi', 'horch', 'dkw', 'wanderer', 'nsu']) { eq(b(id).mergedInto, 'autounion', id + ' merged into'); eq(b(id).status, 'defunct'); }
+  eq(b('mercedes').name, 'Mercedes-Benz', 'rebranded in 1960');
+  eq(b('autounion').name, 'Audi', 'rebranded in 1978');
+  assert(b('autounion').names.indexOf('Auto Union') >= 0 && b('mercedes').names.indexOf('Daimler-Benz') >= 0, 'old names are kept');
+  eq(MERGERS.length, 3);
+});
+test('slice 4: the 1932 merger leaves one team, not four', () => {
+  const w = createWorld({ seed: 'merge-1932' });
+  while (w.year < 1934) { runSeason(w); advanceYear(w); }
+  for (const id of ['audi', 'horch', 'dkw', 'wanderer']) {
+    const b = w.brands.find((x) => x.id === id);
+    eq(b.status, 'defunct', id);
+    assert(!w.teams.some((t) => t.active && t.brandId === id), id + ' still has an active team');
+  }
+  assert(w.teams.filter((t) => t.active && t.brandId === 'autounion').length <= 1, 'more than one Auto Union team');
+});
+test('slice 4: engine-only makers build engines but never run a works team, and customers always have engines', () => {
+  eq(AUD.engineOnlyWorks.length, 0, AUD.engineOnlyWorks.slice(0, 3).join());
+  eq(AUD.deadBrand.length, 0, 'a team without a racing maker: ' + AUD.deadBrand.slice(0, 3).join());
+  assert(AUD.engineOnlySupplied.size >= 3, 'engine builders supplied: ' + [...AUD.engineOnlySupplied].join());
+  assert(engineOnlyAt('mercedes', 1970) && !engineOnlyAt('mercedes', 1930) && !engineOnlyAt('mercedes', 2012), 'Mercedes is an engine maker only from 1955 to 2009');
+  assert(engineOnlyAt('brm', 1960) && engineOnlyAt('brm', 2020));
+});
+test('slice 4: oil and fuel deals start in 1960, every team has exactly one, and the supplier is also the sponsor', () => {
+  eq(AUD.early.length, 0, 'before 1960: ' + AUD.early.slice(0, 3).join());
+  eq(AUD.oilMissing.length, 0, AUD.oilMissing.slice(0, 3).join(' | '));
+  eq(AUD.oilStale.length, 0, 'sponsor row differs from the deal: ' + AUD.oilStale.slice(0, 3).join(' | '));
+  eq(OIL_FROM, 1960);
+  for (const name of ['Shell', 'BP', 'Mobil 1', 'Gulf', 'Total', 'Castrol', 'Exxon', 'Elf', 'Eni', 'STP', 'Havoline', 'Valvoline', 'Sonoco', 'Idemitsu', 'Motul', 'Aramco', 'Petronas', 'Sonangol', 'SONABHY', 'Petrobras', 'Pemex', 'Ampol', 'GNPC', 'PetroChina', 'Gazprom', 'Bapco Energies', 'Sonatrach'])
+    assert(OILS.some((o) => o.name === name), name + ' is not a supplier');
+  assert(LONG.w.oils.length >= 15, 'few suppliers in the save');
+});
+test('slice 4: a company never sponsors a team it is not supplying', () => {
+  eq(AUD.conflict.length, 0, AUD.conflict.slice(0, 3).join(' | '));
+  const w = LONG.w;
+  for (const t of w.teams.filter((x) => x.active)) {
+    const ids = (t.sponsors || []).map((d) => d.id);
+    eq(new Set(ids).size, ids.length, t.name + ' has a sponsor twice');
+  }
+});
+test('slice 4: teams are founded by champions and by engineers, and makers buy teams and sell them', () => {
+  const kinds = {};
+  for (const t of LONG.w.teams) kinds[(t.origin && t.origin.type) || 'none'] = (kinds[(t.origin && t.origin.type) || 'none'] || 0) + 1;
+  assert(kinds['driver-founder'] >= 2, 'no driver-founded teams: ' + JSON.stringify(kinds));
+  assert(kinds['buyout'] >= 2, 'no works team was ever sold on: ' + JSON.stringify(kinds));
+  assert(kinds['manufacturer-buyin'] >= 1, 'no maker ever bought a team: ' + JSON.stringify(kinds));
+  assert(kinds['manufacturer'] >= 5, 'few original works teams');
+  for (const t of LONG.w.teams.filter((x) => x.origin && x.origin.type === 'driver-founder')) {
+    const d = driverById(LONG.w, t.origin.driverId);
+    assert(d && d.titles >= 0, 'founder missing');
+  }
+});
+test('slice 4: a team with an engine partner uses that partner\'s engine', () => {
+  const partnered = LONG.w.teams.filter((t) => t.active && t.partner);
+  for (const t of partnered) eq(t.brandId, t.partner.brandId, t.name);
+});
+test('slice 4: real corporate groups form on the real dates', () => {
+  eq(groupOfBrand('autounion', 1980), 'vw'); eq(groupOfBrand('autounion', 1950), null, 'Auto Union was independent before VW');
+  eq(groupOfBrand('chrysler', 1950), 'mopar'); eq(groupOfBrand('chrysler', 2016), 'fiat');
+  eq(groupOfBrand('peugeot', 2024), 'fiat'); eq(groupOfBrand('peugeot', 1990), 'psa');
+  eq(groupOfBrand('mercedes', 2000), 'daimlerchrysler'); eq(groupOfBrand('chevrolet', 1950), 'gm');
+  const fiat = GROUPS.find((g) => g.id === 'fiat');
+  eq(groupName(fiat, 2000), 'Fiat Group'); eq(groupName(fiat, 2016), 'Fiat Chrysler'); eq(groupName(fiat, 2024), 'Stellantis');
+  eq(groupName(GROUPS.find((g) => g.id === 'mopar'), 1950), 'Mopar');
+  const w = LONG.w;
+  assert(w.brands.filter((b) => b.corp).length >= 8, 'few makers belong to a group');
+  for (const b of w.brands.filter((x) => x.corp)) assert(GROUPS.some((g) => g.id === b.corp), b.id + ' in unknown group ' + b.corp);
+});
+test('slice 4: sister makers pool programmes and some of them end', () => {
+  const all = LONG.w.programmes || [];
+  assert(all.length >= 1, 'no programme in a century');
+  for (const p of all) {
+    assert(['engine', 'chassis', 'full', 'pool'].indexOf(p.kind) >= 0, 'kind ' + p.kind);
+    assert(p.quality >= -0.1 && p.quality <= 0.12, 'quality ' + p.quality);
+    assert(p.leadId !== p.partnerId);
+  }
+  assert(activeProgrammes(LONG.w).length <= all.length);
+});
+test('slice 4: the history of each season records team and maker ids', () => {
+  const h = LONG.w.history.seasons.filter((x) => x.final && x.champion).slice(-5);
+  assert(h.length === 5);
+  for (const s of h) {
+    assert(s.final.drivers[0].teamId != null && s.final.drivers[0].brandId, 'driver rows lack a team');
+    assert(s.final.teams && s.final.teams.length >= 8 && s.final.teams[0].pts >= s.final.teams[1].pts, 'team table');
+    assert(s.final.entries && s.final.entries[0].teamId != null, 'entry rows lack a team');
+  }
+});
+test('slice 4: colours: every maker and team has a readable palette', () => {
+  const w = LONG.w;
+  const hex = /^#[0-9a-f]{6}$/;
+  for (const b of w.brands) {
+    const p = brandPalette(b.id);
+    assert(hex.test(p[0]) && hex.test(p[1]), b.id + ' palette ' + p);
+    assert(contrast(p[0], inkOn(p[0])) >= 4.5, b.id + ' text on its colour is hard to read');
+  }
+  for (const t of w.teams) {
+    const p = teamPalette(w, t.id);
+    assert(hex.test(p[0]) && hex.test(p[1]), t.name + ' palette');
+    if (t.kind === 'works') eq(p.join(), brandPalette(t.brandId).join(), t.name + ' wears its maker\'s colours');
+  }
+  const sold = w.teams.find((t) => t.origin && t.origin.type === 'buyout' && t.kind === 'privateer');
+  if (sold) assert(sold.colors && sold.colors.length === 2, 'a sold-off team keeps its old colours');
+});
+test('slice 4: save: a version 3 save gains oil, groups and origins and plays on', () => {
+  const w = createWorld({ seed: 'mig3' });
+  while (w.year < 1972) { runSeason(w); advanceYear(w); }
+  runRound(w);
+  const old = deepClone(w);
+  old.version = 3;
+  delete old.oils; delete old.programmes;
+  for (const b of old.brands) { delete b.corp; delete b.names; delete b.mergedFrom; delete b.mergedInto; }
+  for (const t of old.teams) { delete t.oilId; delete t.oilUntil; delete t.origin; t.sponsors = (t.sponsors || []).filter((d) => !d.supplier); }
+  const loaded = deserialize(JSON.stringify({ format: 'msc-save', version: 3, world: old }), 'X');
+  eq(loaded.version, SAVE_VERSION);
+  assert(loaded.oils.length > 5, 'no oil suppliers after the upgrade');
+  assert(loaded.teams.filter((t) => t.active).every((t) => t.oilId && (t.sponsors || []).some((d) => d.supplier === 'oil')), 'a team has no oil deal');
+  assert(loaded.teams.every((t) => t.origin && t.origin.type), 'origins missing');
+  assert(loaded.brands.every((b) => Array.isArray(b.names) && b.corp !== undefined), 'brands not upgraded');
+  runSeason(loaded); advanceYear(loaded); runSeason(loaded);
+  assert(pages.pageTeam(loaded, loaded.teams.find((t) => t.active).id).length > 500);
+});
+test('slice 4: save: the current version round-trips the new fields', () => {
+  eq(SAVE_VERSION, 4);
+  const w = LONG.w;
+  const again = deserialize(serialize(w), 'Y');
+  eq(JSON.stringify(again.programmes), JSON.stringify(w.programmes));
+  eq(JSON.stringify(again.oils), JSON.stringify(w.oils));
+  eq(again.teams.find((t) => t.active).oilId, w.teams.find((t) => t.active).oilId);
+});
+test('slice 4: the new pages draw: season standings, groups, oil, tyres and the series tabs', () => {
+  const w = LONG.w;
+  const bad = [];
+  const chk = (k, html) => { if (typeof html !== 'string' || html.length < 200 || badHtml(html)) bad.push(k); };
+  const years = w.history.seasons.filter((h) => h.final && h.champion).map((h) => h.year);
+  assert(years.length > 80, 'few seasons with final tables: ' + years.length);
+  for (const y of [years[0], years[20], years[50], years[years.length - 1]]) chk('standings' + y, pages.pageSeasonStandings(w, y));
+  chk('standings-live', pages.pageStandings(w));
+  chk('groups', pages.pageGroups(w));
+  for (const g of GROUPS) chk('group' + g.id, pages.pageGroup(w, g.id));
+  for (const o of w.oils) chk('oil' + o.id, pages.pageOil(w, o.id));
+  for (const m of w.tyres) chk('tyre' + m.id, pages.pageTyre(w, m.id));
+  for (const s of w.series) { chk('chronicle' + s.id, pages.pageSeries(w, s.id, 'chronicle')); chk('records' + s.id, pages.pageSeries(w, s.id, 'records')); }
+  for (const s of w.series.filter((x) => x.history.some((h) => h.champion)).slice(0, 4)) {
+    const y = s.history.filter((h) => h.champion).pop().year;
+    chk('chronicle' + s.id + 'y' + y, pages.pageSeries(w, s.id, 'chronicle', y));
+  }
+  assert(!bad.length, 'bad output in: ' + bad.slice(0, 8).join());
+});
+test('slice 4: pages show team colours, makers\' badges and the seasons a driver drove', () => {
+  const w = LONG.w;
+  const live = deepClone(w); runRound(live); runRound(live);
+  assert(/class="tc[ "]/.test(pages.pageStandings(live)), 'running standings carry no team colours');
+  assert(/class="tc[ "]/.test(pages.pageTeams(w)), 'team list carries no team colours');
+  assert(/class="branded"/.test(pages.pageBrand(w, w.brands.find((b) => b.status === 'racing').id)), 'maker page is not branded');
+  const works = w.teams.find((t) => t.active && t.kind === 'works');
+  assert(/class="branded"/.test(pages.pageTeam(w, works.id)), 'team page is not branded');
+  const champ = driverById(w, w.history.seasons.filter((h) => h.champion).pop().champion.id);
+  const html = pages.pageDriver(w, champ.id);
+  assert(/year by year/i.test(html) && /#\/standings\/\d{4}/.test(html), 'driver page lacks the year-by-year teams');
+  const chron = pages.pageChronicle(w, w.year - 1);
+  assert(/#\/standings\/\d{4}/.test(chron), 'chronicle does not link to the points tables');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

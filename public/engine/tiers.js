@@ -388,9 +388,10 @@ export function endTierSeasons(world, year, rng) {
 function churnLowTeams(world, year, rng) {
   for (const t of world.lowTeams.filter((x) => !x.ended).sort((a, b) => a.id - b.id)) {
     const r = rng.fork('lt', t.id);
-    t.strength = MINI(clamp(t.strength + r.gauss(0, 0.03) + (t.prestige - 30) * 0.0005, 0.1, 0.9));
+    t.strength = MINI(clamp(t.strength + r.gauss(0, 0.03) + (t.prestige - 30) * 0.0005 + (t.ambition ? 0.008 : 0), 0.1, 0.9));
     let p = 0.05 + (t.wealth < 0.15 ? 0.06 : 0) + (t.prestige < 8 ? 0.03 : 0);
     if (year - t.founded > 20) p *= 0.5;
+    if (t.ambition) p *= 0.25;
     if (r.next() < p) { t.ended = year; }
   }
 }
@@ -520,13 +521,20 @@ export function tiersTransition(world, year, rng, gov, propose) {
   grassroots(world, year, rng.fork('grass'));
   academies(world, year, rng.fork('academy'));
   seriesPlan(world, year, rng.fork('plan'), gov, propose);
-  // strong continental teams apply for a Tier 1 entry (they pay, and pre-qualify)
-  if (year >= 1950) {
-    for (const s of activeSeries(world).filter((x) => x.kind === 'continental')) {
-      for (const id of s.teamIds) {
-        const t = lowTeamById(world, id);
-        if (!t || t.strength < 0.62 || t.wealth < 0.35 || t.prestige < 25) continue;
-        if (rng.fork('apply', t.id).chance(0.05)) propose('entry-team', { lowTeamId: t.id }, `${t.name} applies for a Tier 1 entry`, `${t.name} (${regionName(t.region)}) has the money and results to try for a Tier 1 entry through pre-qualifying.`);
+  // strong continental teams apply for a Tier 1 entry (they pay, and pre-qualify); a team founded
+  // by a champion reaches for the top from any series as soon as it is good enough
+  const asked = new Set(world.inbox.filter((i) => i.status === 'pending' && i.kind === 'entry-team').map((i) => i.payload.lowTeamId));
+  for (const s of activeSeries(world)) {
+    for (const id of s.teamIds) {
+      const t = lowTeamById(world, id);
+      if (!t || t.ended || asked.has(t.id)) continue;
+      const amb = !!t.ambition;
+      if (!amb && (s.kind !== 'continental' || year < 1950)) continue;
+      if (t.strength < (amb ? 0.5 : 0.62) || t.wealth < (amb ? 0.28 : 0.35) || t.prestige < (amb ? 14 : 25)) continue;
+      if (amb && year - t.founded < 2) continue;
+      if (rng.fork('apply', t.id).chance(amb ? 0.3 : 0.05)) {
+        asked.add(t.id);
+        propose('entry-team', { lowTeamId: t.id }, `${t.name} applies for a Tier 1 entry`, `${t.name} (${regionName(t.region)})${t.founder ? ', founded by ' + t.founder.name + ',' : ''} has the money and results to try for a Tier 1 entry through pre-qualifying.`);
       }
     }
   }
