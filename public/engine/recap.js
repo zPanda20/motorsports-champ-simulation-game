@@ -38,9 +38,9 @@ export function rowLabel(world, row) {
 export function raceRecap(world, summary) {
   const T = TRACK_BY_ID[summary.trackId];
   const lines = [];
-  lines.push(`Round ${summary.round + 1}: ${T.name}, ${summary.laps} laps (${summary.distanceKm} km)` + (summary.rain ? `, rain from lap ${summary.rain.start} to ${summary.rain.end}` : ', dry'));
-  const failed = summary.prequal.failed.length;
-  lines.push(`Pre-qualifying: ${summary.prequal.exempt.length} exempt, ${failed} failed to qualify.`);
+  lines.push(`Round ${summary.round + 1}: ${T.name}${summary.laps ? ', ' + summary.laps + ' laps' : ''}${summary.distanceKm ? ' (' + summary.distanceKm + ' km)' : ''}` + (summary.rain ? `, rain from lap ${summary.rain.start} to ${summary.rain.end}` : ', dry'));
+  const pq = summary.prequal || { failed: [], exempt: [] };
+  if (summary.prequal) lines.push(`Pre-qualifying: ${pq.exempt.length} exempt, ${pq.failed.length} failed to qualify.`);
   const winner = summary.classification.find((r) => r.pos === 1);
   if (winner) {
     const team = teamById(world, winner.teamId);

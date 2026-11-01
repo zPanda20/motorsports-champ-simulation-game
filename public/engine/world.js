@@ -5,12 +5,16 @@ import { PARAMS } from './params.js';
 import { defaultRegs, eraFor } from './data/eras.js';
 import { eventsFor } from './data/events.js';
 import { BRANDS } from './data/brands.js';
-import { tracksOpenIn } from './data/tracks.js';
+import { tracksOpenIn, TRACK_BY_ID } from './data/tracks.js';
+import { initTiers, startTierSeasons } from './tiers.js';
 import { nationalityWeights, makePersonName, makeTeamName } from './names.js';
 import { legendRoster, makeDriverFromLegend, makeDriver, statsAt, overallAt, peakOverall } from './drivers.js';
-import { buildCar } from './car.js';
+import { buildCar, evolveCar } from './car.js';
+import { initTeamOrg, initBrandOrg, avgFac, budgetBase, signContract } from './org.js';
+import { adoptionShares, usableTechs, techBonus } from './techs.js';
+import { regionOf } from './data/regions.js';
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 const TYRE_MAKERS = [
   { id: 'dunlop', name: 'Dunlop', country: 'GB', founded: 1889 },
@@ -19,6 +23,10 @@ const TYRE_MAKERS = [
   { id: 'firestone', name: 'Firestone', country: 'US', founded: 1900 },
   { id: 'pirelli', name: 'Pirelli', country: 'IT', founded: 1872 },
   { id: 'continental', name: 'Continental', country: 'DE', founded: 1871 },
+  { id: 'avon', name: 'Avon', country: 'GB', founded: 1885 },
+  { id: 'yokohama', name: 'Yokohama', country: 'JP', founded: 1917 },
+  { id: 'bridgestone', name: 'Bridgestone', country: 'JP', founded: 1931 },
+  { id: 'hankook', name: 'Hankook', country: 'KR', founded: 1941 },
 ];
 
 // ---------------------------------------------------------------- small helpers
@@ -61,7 +69,7 @@ export function makeStaff(rng, nat, used, wealth) {
   };
 }
 
-function usedNames(world) {
+export function usedNames(world) {
   const used = new Set();
   for (const l of legendRoster()) used.add(l.full);
   for (const d of world.drivers) used.add(d.name);
@@ -111,6 +119,7 @@ export function newBrandObject(def, rng, year) {
     sellsCustomers: rng.chance(0.55),
     raceYears: 0, badYears: 0, defunctSince: null,
     wins: 0, titles: 0,
+    tech: {}, risk: r3(rng.float(0.15, 0.9)), commitment: 1, fans: Math.round(clamp(strength * 40 + rng.gauss(5, 5), 1, 80)),
   };
 }
 
@@ -163,8 +172,10 @@ export function activateWorks(world, brand, rng, year) {
       active: true, titles: 0, wins: 0, foundedYear: year, endedYear: null,
     };
     world.teams.push(team);
+    initTeamOrg(world, team, rng.fork('org'), year);
   } else {
-    team.active = true; team.endedYear = null;
+    team.active = true; team.endedYear = null; team.closed = null;
+    team.finance.cash = Math.max(team.finance.cash, Math.round(budgetBase(year) * 0.3));
   }
   brand.status = 'racing';
   brand.raceYears = 0; brand.badYears = 0;
@@ -178,29 +189,44 @@ export function deactivateTeam(world, team, year) {
   for (const e of world.entries) if (e.teamId === team.id) { e.active = false; e.driverId = null; }
 }
 
-export function addPrivateerTeam(world, rng, year) {
-  const nat = rng.weighted(nationalityWeights(year), (x) => x.w).n;
+export function addPrivateerTeam(world, rng, year, opts = {}) {
+  const nat = opts.nat || rng.weighted(nationalityWeights(year), (x) => x.w).n;
   const used = usedNames(world);
   const names = new Set(world.teams.map((t) => t.name));
-  const wealth = clamp(rng.gauss(0.35, 0.12), 0.1, 0.7);
+  const wealth = clamp(rng.gauss(opts.rich ? 0.6 : 0.35, 0.12), 0.1, opts.rich ? 0.9 : 0.7);
   const team = {
     id: ++world.counters.team, name: makeTeamName(rng, nat, names), nat, kind: 'privateer',
-    brandId: pickSupplier(world, rng, null),
+    brandId: opts.brandId || pickSupplier(world, rng, null),
     tyreId: rng.pick(world.tyres.map((t) => t.id)), wealth: Math.round(wealth * 100) / 100,
     staff: makeStaff(rng, nat, used, wealth),
     control: rng.pick(['principal', 'engineer', 'driver']),
     owner: { patience: rng.int(25, 80), pockets: Math.round(wealth * 100) },
     active: true, titles: 0, wins: 0, foundedYear: year, endedYear: null,
   };
+  if (opts.groupId) { team.groupId = opts.groupId; team.relation = opts.relation; team.parentId = opts.parentId; }
   world.teams.push(team);
+  initTeamOrg(world, team, rng.fork('org'), year);
   syncEntries(world, team, rng);
   if (world.regs.entries.partial >= 1 && wealth > 0.3 && rng.chance(0.35)) addEntry(world, team, 'partial', rng);
   return team;
 }
 
+// Brings a closed team back under new investors, keeping its record and facilities.
+export function activateTeam(world, team, year) {
+  const rng = makeRng(world.seed, 'revive', team.id, year);
+  team.active = true; team.endedYear = null; team.closed = null;
+  team.owner = null;
+  initTeamOrg(world, team, rng.fork('org'), year);
+  team.finance.cash = Math.round(budgetBase(year) * 0.4);
+  team.wealth = Math.max(team.wealth, 0.3);
+  team.brandId = pickSupplier(world, rng.fork('supplier'), team.brandId);
+  syncEntries(world, team, rng.fork('entries'));
+  return team;
+}
+
 // ---------------------------------------------------------------- creation
 
-export function createWorld({ seed, year = 1919 } = {}) {
+export function createWorld({ seed, year = 1919, governor = 'traditionalist', mode = 'auto' } = {}) {
   seed = seed === undefined || seed === null || seed === '' ? 'default' : String(seed);
 
   const world = {
@@ -219,8 +245,14 @@ export function createWorld({ seed, year = 1919 } = {}) {
     history: { seasons: [] },
     chronicle: [],
     cohortThrough: PARAMS.world.birthStart - 1,
-    counters: { entry: 0, driver: 0, team: 0 },
+    counters: { entry: 0, driver: 0, team: 0, series: 0, lowTeam: 0, decision: 0 },
     meta: { createdAt: 0, name: 'Series ' + seed },
+    epoch: 0,
+    series: [], lowTeams: [], grass: {},
+    governor: { personality: governor, mode, manual: {} },
+    inbox: [], decisions: [], phase: 'season',
+    titleSponsor: null,
+    academies: {},
   };
 
   // tyre suppliers (exclusive contracts early on)
@@ -269,9 +301,13 @@ export function createWorld({ seed, year = 1919 } = {}) {
     }
   }
 
+  world.regs.overridden = {};
   assignDrivers(world, makeRng(seed, 'world', 'grid'));
+  assignTyres(world, makeRng(seed, 'world', 'tyre-assign'), year);
   buildAllCars(world, makeRng(seed, 'world', 'cars', year));
+  initTiers(world, year, makeRng(seed, 'world', 'tiers'));
   startSeason(world);
+  startTierSeasons(world, year);
   return world;
 }
 
@@ -298,15 +334,102 @@ function assignDrivers(world, rng) {
   for (const e of entryOrder) {
     const idx = Math.min(remaining.length - 1, Math.floor(Math.abs(rng.gauss(0, 4))));
     e.driverId = remaining[idx].id;
+    signContract(world, e, remaining[idx], world.year, rng.fork('contract', e.id));
     remaining.splice(idx, 1);
   }
 }
 
+// Which brand-like object a team's car is built from this year. Under strict chassis
+// rules a privateer is a constructor: its own chassis (from its people and factory)
+// with a bought engine.
+function carBrandFor(world, team, brand) {
+  if (team.kind === 'works' || world.regs.chassisSupply !== 'strict') return { b: brand, customer: team.kind !== 'works' };
+  const ts = clamp(0.22 + team.wealth * 0.3 + (team.staff.techDirector.rating - 50) / 220 + (avgFac(team) - 40) / 280, 0.2, 0.9);
+  const rel = clamp(brand.reliability * 0.5 + ts * 0.5, 0.15, 0.95);
+  return { b: { id: brand.id, chassisStrength: ts, engineStrength: brand.engineStrength, reliability: rel }, customer: false, constructor: true };
+}
+
 export function buildAllCars(world, rng) {
+  const year = world.year;
+  const shares = adoptionShares(world, year);
+  const items = [];
   for (const e of activeEntries(world)) {
     const team = teamById(world, e.teamId);
     const brand = brandById(world, team.brandId);
-    e.car = buildCar(rng.fork('entry', e.id), { brand, staff: team.staff, customer: team.kind !== 'works', year: world.year });
+    const { b, customer, constructor } = carBrandFor(world, team, brand);
+    team.builder = !!constructor;
+    const ids = usableTechs(world, team, year);
+    const bonus = techBonus(ids, shares);
+    items.push({ e, team, b, customer, ids, bonus });
+  }
+  // centre the technology bonus on the grid, so only the differences matter
+  const keys = ['handling', 'brakes', 'power', 'rel', 'weight'];
+  const mean = {};
+  for (const k of keys) mean[k] = items.length ? items.reduce((a, it) => a + it.bonus[k], 0) / items.length : 0;
+  for (const it of items) for (const k of keys) it.bonus[k] -= mean[k];
+
+  for (const it of items) {
+    const { e, team, b, customer, ids, bonus } = it;
+    const r = rng.fork('entry', e.id);
+    const fresh = buildCar(r, { brand: b, staff: team.staff, customer, year, bonus, facilities: avgFac(team), techs: ids });
+    const prev = e.car;
+    const redesign = !prev || prev.epoch !== world.epoch || (year - prev.designYear) >= (team.cycle || 4) || (prev.techs && ids.some((id) => prev.techs.indexOf(id) < 0 && ['monocoque', 'rearEngine', 'carbonFibre', 'groundEffect'].indexOf(id) >= 0));
+    const devGain = (team.finance ? team.finance.devPower : 1) * (team.staff.techDirector.rating / 100) * 1.1;
+    const car = evolveCar(prev, fresh, { newDesign: redesign, devGain, rng: r.fork('evolve') });
+    car.epoch = world.epoch;
+    car.techs = ids;
+    e.car = car;
+  }
+}
+
+// Tyre contracts follow the rule in force: exclusive deals, a tyre war with a free
+// choice each year, a single supplier, or a two-supplier war.
+export function assignTyres(world, rng, year) {
+  const makers = world.tyres.slice();
+  if (!makers.length) return;
+  const rule = world.regs.tyreRule;
+  const score = (m) => m.grip * 0.35 + m.durability * 0.25 + m.puncture * 0.2 + m.wet * 0.2;
+  const ranked = makers.slice().sort((a, b) => score(b) - score(a) || a.id.localeCompare(b.id));
+  const teams = world.teams.filter((t) => t.active).sort((a, b) => a.id - b.id);
+  if (rule === 'single supplier') {
+    let id = world.tyreSole && world.tyreSole.until >= year ? world.tyreSole.id : null;
+    if (!id || !makers.some((m) => m.id === id)) {
+      const m = rng.fork('sole').weighted(ranked.slice(0, 3), (x) => score(x));
+      id = m.id; world.tyreSole = { id, until: year + rng.fork('sole-len').int(3, 8) };
+      logEvent(world, year, 'tyres', `${m.name} becomes the sole tyre supplier.`);
+    }
+    for (const t of teams) t.tyreId = id;
+  } else if (rule === 'two-supplier war') {
+    const two = ranked.slice(0, 2).map((m) => m.id);
+    for (const t of teams) if (two.indexOf(t.tyreId) < 0 || rng.fork('two', t.id).chance(0.12)) t.tyreId = rng.fork('two2', t.id).pick(two);
+  } else if (rule === 'tyre war') {
+    for (const t of teams) {
+      const r = rng.fork('war', t.id);
+      if (!makers.some((m) => m.id === t.tyreId) || r.chance(0.3)) t.tyreId = r.weighted(makers, (m) => score(m)).id;
+    }
+  } else {
+    // exclusive contracts: stay with the maker unless it has gone
+    for (const t of teams) {
+      const r = rng.fork('excl', t.id);
+      if (!makers.some((m) => m.id === t.tyreId) || r.chance(0.06)) t.tyreId = r.weighted(makers, (m) => score(m)).id;
+    }
+  }
+}
+
+// Tyre makers develop; in a war they push harder.
+export function developTyres(world, year, rng) {
+  const war = world.regs.tyreRule === 'tyre war' || world.regs.tyreRule === 'two-supplier war';
+  for (const m of world.tyres) {
+    const r = rng.fork(m.id);
+    m.engineer = m.engineer || { name: 'Unknown', rating: 50 };
+    for (const k of ['grip', 'durability', 'puncture', 'wet']) m[k] = Math.round(clamp(m[k] + r.gauss(war ? 0.8 : 0, 3), 25, 85));
+  }
+  for (const t of TYRE_MAKERS) {
+    if (t.founded === year && !world.tyres.some((m) => m.id === t.id)) {
+      const r = rng.fork('new', t.id);
+      world.tyres.push({ id: t.id, name: t.name, country: t.country, grip: Math.round(clamp(r.gauss(52, 8), 35, 72)), durability: Math.round(clamp(r.gauss(52, 8), 35, 72)), puncture: Math.round(clamp(r.gauss(50, 9), 30, 72)), wet: Math.round(clamp(r.gauss(45, 9), 25, 65)) });
+      logEvent(world, year, 'tyres', `${t.name} enters the tyre business.`);
+    }
   }
 }
 
@@ -318,7 +441,8 @@ export function applyEraRegs(world, year) {
   if (world.regs.touched || world.regs.eraFrom === era.from) return false;
   const fresh = defaultRegs(year);
   world.regs = { ...fresh, exemptTop: world.regs.exemptTop, raceKm: world.regs.raceKm, minLaps: world.regs.minLaps };
-  logEvent(world, year, 'regs', `Regulation reset for the ${era.name} era: top ${fresh.scoring.length} score, grid of ${fresh.gridCap}, ${fresh.rounds} rounds.`);
+  world.epoch = (world.epoch || 0) + 1;
+  logEvent(world, year, 'regs', `Regulation reset for the ${era.name} era: top ${fresh.scoring.length} score, grid of ${fresh.gridCap}, ${fresh.rounds} rounds; chassis supply ${fresh.chassisSupply}.`);
   return true;
 }
 
@@ -337,10 +461,14 @@ export function startSeason(world) {
     if (e.type !== 'partial') continue;
     partialPlan[e.id] = rng.fork('partial', e.id).shuffle(calendar.map((_, i) => i)).slice(0, partialRounds).sort((a, b) => a - b);
   }
+  // endurance rounds: the longest venues on the calendar
+  const endN = Math.max(0, Math.min(world.regs.endurance ? world.regs.endurance.events : 0, calendar.length - 3));
+  const byLen = calendar.map((id, i) => ({ i, len: TRACK_BY_ID[id].lengthKm })).sort((a, b) => b.len - a.len || a.i - b.i).slice(0, endN).map((x) => x.i).sort((a, b) => a - b);
   world.season = {
     year: world.year,
     round: 0,
     calendar,
+    endurance: byLen,
     partialPlan,
     standings: { entries: {}, drivers: {}, brands: {} },
     results: [],

@@ -6,13 +6,19 @@
 import { makeRng, clamp } from './rng.js';
 import { PARAMS as P } from './params.js';
 import { BRANDS } from './data/brands.js';
-import { eraFor } from './data/eras.js';
+import { stability, eraFor } from './data/eras.js';
 import { eventsFor } from './data/events.js';
 import {
   newBrandObject, activateWorks, deactivateTeam, addPrivateerTeam, addEntry, syncEntries, pickSupplier,
   logEvent, activeEntries, brandById, teamById, driverById, eligibleDriver, ensureCohorts, applyEraRegs,
 } from './world.js';
 import { overallAt, peakOverall, retirementChance } from './drivers.js';
+import { adoptTechs } from './techs.js';
+import { orgYear, signContract, makeOwner } from './org.js';
+import { tiersTransition, scoutEstimate } from './tiers.js';
+import { propose, governorYear, settle, traits } from './governor.js';
+import { assignTyres, developTyres, activateTeam, makeStaff, usedNames } from './world.js';
+import { nationalityWeights as natW } from './names.js';
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
 
@@ -46,6 +52,11 @@ function developBrands(world, rng, last) {
     }
     if (last && last.titleBrandId === b.id) s += 0.012;
     s = clamp(s, 0.15, 0.95);
+    // company health is slow and separate from racing commitment (world conditions plus a roll)
+    const ev0 = eventsFor(world.year);
+    b.health = r3(clamp((b.health === undefined ? s : b.health) + 0.18 * (s - (b.health === undefined ? s : b.health)) - ev0.brandExit * 0.7 + r.gauss(0, 0.03), 0.05, 1));
+    const buffer = Math.min(0.3, b.titles * 0.02 + b.raceYears * 0.004);
+    b.commitment = r3(clamp(0.45 + b.health * 0.75 + buffer - (last && last.brandRank && last.brandRank[b.id] > 0.7 ? 0.1 : 0), 0.2, 1.2));
     for (const k of ['chassisStrength', 'engineStrength', 'reliability']) {
       b[k] = r3(clamp(b[k] + 0.3 * (s + r.gauss(0, 0.06) - b[k]), 0.12, 0.97));
     }
@@ -68,10 +79,12 @@ function brandLifecycle(world, year, rng, ev, last) {
   for (const b of world.brands.slice().sort((a, c) => a.id.localeCompare(c.id))) {
     if (b.status !== 'racing') continue;
     const r = rng.fork('exit', b.id);
-    let p = 0.006 + ev.brandExit;
+    let p = (0.006 + ev.brandExit) * (0.4 + 0.6 * stability(year));
     if (b.strength < 0.38) p += 0.06;
     if (b.badYears >= 3) p += 0.08;
+    if (b.health !== undefined && b.health < 0.3) p += 0.07;
     if (b.raceYears > 25) p *= 0.5;
+    p *= 1 - Math.min(0.5, b.titles * 0.03 + b.raceYears * 0.006); // legacy buffers bad patches
     p *= clamp(W / target, 0.6, 1.8);
     if (W <= 3) p *= 0.2;
     if (r.next() < p) {
@@ -91,9 +104,8 @@ function brandLifecycle(world, year, rng, ev, last) {
     if (b.foundedInGame === year && b.founded === year) p = Math.max(p, 0.4 * ev.brandEntry);
     if (W >= target + 3) p *= 0.1;
     if (r.next() < p) {
-      activateWorks(world, b, r.fork('team'), year);
+      propose(world, year, 'entry-works', { brandId: b.id }, `${b.name} asks to enter`, `${b.name} (${b.country}) wants to enter the championship with a works team. Strength ${Math.round(b.strength * 100)}, ${b.titles} titles in the past.`);
       W++;
-      logEvent(world, year, 'brand', `${b.name} enters the championship with a works team.`);
     }
   }
 
@@ -126,45 +138,62 @@ function privateerTeams(world, year, rng, ev, last) {
   for (const t of world.teams.filter((x) => x.kind === 'privateer' && x.active)) {
     const r = rng.fork('team', t.id);
     const rank = last && last.teamRank ? last.teamRank[t.id] : 0.5;
-    let p = 0.04 + ev.teamFold + (rank > 0.5 ? 0.05 : 0) + ((100 - t.owner.patience) / 100) * 0.05;
-    if (t.wealth < 0.2) p += 0.05;
-    if (year - t.foundedYear > 25) p *= 0.5;
-    if (count <= 2) p *= 0.2;
-    if (r.next() < p) {
-      deactivateTeam(world, t, year);
-      count--;
-      logEvent(world, year, 'team', `${t.name} folds.`);
-      continue;
-    }
     t.brandId = pickSupplier(world, r.fork('supplier'), t.brandId);
-    t.wealth = Math.round(clamp(t.wealth + r.gauss(0, 0.03) + (rank < 0.3 ? 0.03 : 0), 0.05, 0.95) * 100) / 100;
     syncEntries(world, t, r.fork('entries'));
     const hasPartial = world.entries.some((e) => e.teamId === t.id && e.type === 'partial' && e.active);
     if (!hasPartial && era.entries.partial >= 1 && t.wealth > 0.45 && r.chance(0.08)) addEntry(world, t, 'partial', r.fork('partial'));
+    void rank;
   }
 
   for (let i = 0; i < 2; i++) {
-    const p = clamp((era.privTarget - count) * 0.22 + 0.06, 0, 0.7) * ev.teamFound;
+    const p = clamp((era.privTarget - count) * 0.22 + 0.06, 0, 0.7) * ev.teamFound * stability(year) * (count >= era.privTarget + 1 ? 0.25 : 1);
     const r = rng.fork('found', i);
     if (r.next() < p) {
-      const t = addPrivateerTeam(world, r.fork('team'), year);
+      propose(world, year, 'entry-team', {}, 'A new team applies to enter', 'Investors want to enter a new privateer team with customer cars.');
       count++;
-      logEvent(world, year, 'team', `${t.name} is founded and joins the grid with ${world.brands.find((b) => b.id === t.brandId).name} cars.`);
     }
   }
 
-  // works teams follow the entry cap in force
   for (const t of world.teams.filter((x) => x.kind === 'works' && x.active)) {
     syncEntries(world, t, rng.fork('works', t.id));
-    const r = rng.fork('works-staff', t.id);
-    for (const k of Object.keys(t.staff)) t.staff[k].rating = Math.round(clamp(t.staff[k].rating + r.gauss(0, 2), 18, 92));
-    t.wealth = Math.round(clamp(t.wealth + r.gauss(0, 0.02), 0.2, 1) * 100) / 100;
   }
-  for (const t of world.teams.filter((x) => x.kind === 'privateer' && x.active)) {
-    const r = rng.fork('priv-staff', t.id);
-    for (const k of Object.keys(t.staff)) t.staff[k].rating = Math.round(clamp(t.staff[k].rating + r.gauss(0, 2), 18, 92));
+  staffYear(world, year, rng.fork('staff'));
+}
+
+// ---------------------------------------------------------------- staff
+
+function staffYear(world, year, rng) {
+  const used = usedNames(world);
+  for (const t of world.teams.filter((x) => x.active).sort((a, b) => a.id - b.id)) {
+    const r = rng.fork('t', t.id);
+    for (const k of Object.keys(t.staff).sort()) {
+      const m = t.staff[k];
+      if (m.age === undefined) m.age = r.fork('age', k).int(28, 58);
+      m.age++;
+      const fac = t.facilities ? (t.facilities.workshops - 50) / 100 : 0;
+      m.rating = Math.round(clamp(m.rating + (m.age < 46 ? 0.8 : -0.8) + r.fork('d', k).gauss(0, 2) + fac, 18, 95));
+      if (m.age >= 64 || (m.age >= 55 && r.fork('ret', k).chance(0.15))) {
+        const nm = makeStaff(r.fork('new', k), t.nat, used, t.wealth)[k];
+        nm.age = r.fork('na', k).int(30, 45);
+        logEvent(world, year, 'staff', `${m.name} retires as ${staffTitle(k)} of ${t.name}; ${nm.name} takes over.`);
+        t.staff[k] = nm;
+      }
+    }
+  }
+  // a great designer can be poached
+  const teams = world.teams.filter((x) => x.active).sort((a, b) => a.id - b.id);
+  for (const buyer of teams) {
+    const r = rng.fork('poach', buyer.id);
+    if (!r.chance(0.07) || buyer.prestige < 30) continue;
+    const targets = teams.filter((x) => x.id !== buyer.id && x.prestige < buyer.prestige && x.staff.techDirector.rating > buyer.staff.techDirector.rating + 8);
+    if (!targets.length) continue;
+    const seller = r.pick(targets);
+    const a = buyer.staff.techDirector, b = seller.staff.techDirector;
+    buyer.staff.techDirector = b; seller.staff.techDirector = a;
+    if (b.rating >= 70) logEvent(world, year, 'staff', `${b.name} leaves ${seller.name} to become technical director of ${buyer.name}.`);
   }
 }
+const staffTitle = (k) => ({ principal: 'team principal', techDirector: 'technical director', raceEngineer: 'race engineer', chiefMechanic: 'chief mechanic' }[k] || k);
 
 // ---------------------------------------------------------------- drivers
 
@@ -174,34 +203,41 @@ function prestige(world, team, last, rng) {
   return b.strength * 0.5 + team.wealth * 0.3 + (1 - rank) * 0.2 + rng.gauss(0, 0.04);
 }
 
+function seatScore(world, d, year) { return scoutEstimate(world, d, year) + (d.rep || 0) * 0.25 + (d.backer ? 2 : 0); }
+
 function driverMarket(world, year, rng, last) {
-  // retirements
+  // retirements: every driver, in every tier
   for (const d of world.drivers) {
     if (d.status !== 'active' || d.birthYear > year - P.world.startAge) continue;
     const p = retirementChance(d, year);
-    if (p > 0 && rng.fork('retire', d.id).next() < p) {
-      d.status = 'retired';
-      d.retiredYear = year;
-    }
+    if (p > 0 && rng.fork('retire', d.id).next() < p) { d.status = 'retired'; d.retiredYear = year; d.tier = null; d.academy = null; }
   }
   const seats = activeEntries(world);
   const keep = [], open = [];
   for (const e of seats) {
     const d = e.driverId != null ? driverById(world, e.driverId) : null;
-    if (d && eligibleDriver(d, year) && rng.fork('contract', e.id).next() > P.industry.contractExpiry) keep.push(e); else { e.driverId = null; open.push(e); }
+    const running = e.contract && e.contract.until >= year;
+    // a contract runs its term; a few are bought out or not renewed
+    const stays = d && eligibleDriver(d, year) && (running ? rng.fork('buyout', e.id).next() > 0.06 : rng.fork('renew', e.id).next() > P.industry.contractExpiry);
+    if (stays) keep.push(e); else { e.driverId = null; e.contract = null; open.push(e); }
   }
   const taken = new Set(keep.map((e) => e.driverId));
-  const score = (d) => overallAt(d, year) * 0.5 + peakOverall(d) * 0.5;
   const pool = world.drivers.filter((d) => eligibleDriver(d, year) && !taken.has(d.id))
-    .map((d) => ({ d, s: score(d) + rng.fork('score', d.id).gauss(0, 4) }))
+    .map((d) => ({ d, s: seatScore(world, d, year) }))
     .sort((a, b) => b.s - a.s || a.d.id - b.d.id);
   const ranked = open.map((e) => ({ e, p: prestige(world, teamById(world, e.teamId), last, rng.fork('prestige', e.id)) }))
     .sort((a, b) => b.p - a.p || a.e.id - b.e.id);
   const pick = rng.fork('pick');
   for (const { e } of ranked) {
     if (!pool.length) break;
-    const idx = Math.min(pool.length - 1, Math.floor(Math.abs(pick.gauss(0, 2.5))));
+    // a group prefers its own academy graduates
+    let idx = -1;
+    const own = pool.findIndex((x) => x.d.academy === e.teamId && x.s > 52);
+    if (own >= 0 && pick.next() < 0.7) idx = own;
+    if (idx < 0) idx = Math.min(pool.length - 1, Math.floor(Math.abs(pick.gauss(0, 2.5))));
     e.driverId = pool[idx].d.id;
+    pool[idx].d.academy = null;
+    signContract(world, e, pool[idx].d, year, pick.fork('c', e.id));
     pool.splice(idx, 1);
   }
 }
@@ -218,7 +254,17 @@ export function industryTransition(world, year, last) {
   foundBrands(world, year, rng.fork('found'));
   developBrands(world, rng.fork('develop'), last);
   brandLifecycle(world, year, rng.fork('life'), ev, last);
+  for (const note of adoptTechs(world, year, rng.fork('tech'))) logEvent(world, year, 'tech', note);
+  orgYear(world, year, rng.fork('org'), last, {
+    ev, deactivate: deactivateTeam, addTeam: (w, r, y, opts) => addPrivateerTeam(w, r, y, opts), activate: activateTeam,
+  });
   privateerTeams(world, year, rng.fork('priv'), ev, last);
+  const gov = traits(world);
+  tiersTransition(world, year, rng.fork('tiers'), gov, (kind, payload, title, text) => propose(world, year, kind, payload, title, text));
+  governorYear(world, year, last, ev);
+  settle(world);
+  developTyres(world, year, rng.fork('tyres'));
+  assignTyres(world, rng.fork('tyre-assign'), year);
   driverMarket(world, year, rng.fork('drivers'), last);
   return ev;
 }
@@ -233,9 +279,8 @@ export function fillVacantSeats(world, year) {
     if (!d || !eligibleDriver(d, year)) e.driverId = null;
   }
   const taken = new Set(seats.map((e) => e.driverId).filter((x) => x != null));
-  const score = (d) => overallAt(d, year) * 0.5 + peakOverall(d) * 0.5;
   const pool = world.drivers.filter((d) => eligibleDriver(d, year) && !taken.has(d.id))
-    .map((d) => ({ d, s: score(d) + rng.fork('score', d.id).gauss(0, 4) }))
+    .map((d) => ({ d, s: seatScore(world, d, year) }))
     .sort((a, b) => b.s - a.s || a.d.id - b.d.id);
   const open = seats.filter((e) => e.driverId == null)
     .map((e) => ({ e, p: prestige(world, teamById(world, e.teamId), null, rng.fork('prestige', e.id)) }))
@@ -245,6 +290,7 @@ export function fillVacantSeats(world, year) {
     if (!pool.length) break;
     const idx = Math.min(pool.length - 1, Math.floor(Math.abs(pick.gauss(0, 2.5))));
     e.driverId = pool[idx].d.id;
+    signContract(world, e, pool[idx].d, year, pick.fork('c', e.id));
     pool.splice(idx, 1);
   }
 }

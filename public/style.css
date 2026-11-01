@@ -189,9 +189,10 @@ h2 { font-size: 20px; } h3 { font-size: 15px; }
 .row, .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
 .sep { width: 14px; }
 .tabs { display: flex; flex-wrap: wrap; margin-bottom: 16px; border: var(--rule) solid var(--rulec); border-radius: var(--radius); width: fit-content; overflow: hidden; box-shadow: var(--shadow); }
-.tabs button { border: 0; border-right: 2px solid var(--rulec); border-radius: 0; }
-.tabs button:last-child { border-right: 0; }
-.tabs button.on { background: var(--tab-on-bg); color: var(--tab-on-fg, #fff); }
+.tabs a { padding: 8px 13px; border-right: 2px solid var(--rulec); border-radius: 0; color: var(--ink); text-decoration: none; font-weight: 700; letter-spacing: .03em; }
+.tabs a:last-child { border-right: 0; }
+.tabs a:hover { background: var(--btn-hover); }
+.tabs a.on { background: var(--tab-on-bg); color: var(--tab-on-fg, #fff); }
 .two { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; }
 .three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .chron { display: grid; grid-template-columns: 250px 1fr; gap: 16px; align-items: start; }
@@ -224,3 +225,38 @@ footer { text-align: center; padding: 18px; border-top: var(--rule) solid var(--
 .evlog li.event { color: var(--a1); font-weight: 700; }
 .race-body { overflow-x: auto; }
 .theme-sel { max-width: 190px; }
+
+/* ---- slice 3: pages, links, meters ---- */
+a.lk { color: inherit; text-decoration: underline; text-decoration-color: var(--a1); text-underline-offset: 3px; font-weight: 600; }
+a.lk:hover { background: var(--a2); color: var(--ink); }
+a.btnlink { display: inline-block; padding: 6px 12px; border: 2px solid var(--rulec); color: var(--ink); text-decoration: none; font-weight: 700; background: var(--btn-bg, var(--bg)); }
+a.btnlink:hover { background: var(--btn-hover); }
+.badge { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px; text-align: center; background: var(--a1); color: #fff; border-radius: 9px; font-size: 12px; }
+.tabs a.on .badge { background: #fff; color: var(--a1); }
+.meter { display: inline-block; width: 90px; height: 9px; background: var(--line); vertical-align: middle; border-radius: 2px; overflow: hidden; margin-left: 4px; }
+.meter > span { display: block; height: 100%; background: var(--a3); }
+dl.kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 6px 0; }
+dl.kv dt { color: var(--muted); font-size: 13px; } dl.kv dd { margin: 0; font-weight: 600; }
+h4 { margin: 14px 0 4px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.hero { margin: 0 0 12px; padding: 4px 0 8px; border-bottom: var(--rule) solid var(--rulec); }
+.hero h2 { font-size: 28px; margin: 0 0 2px; }
+.hero .tag { margin-right: 4px; }
+.tag.gold { background: var(--a2); color: #000; }
+.back { margin-bottom: 8px; font-size: 14px; }
+.scroll { max-height: 460px; overflow: auto; border: 1px solid var(--line); }
+.chron-table td:nth-child(1) { font-weight: 800; }
+tr.on td { background: var(--hover); }
+.champ .bigname { font-size: 26px; font-weight: 800; }
+.notice { border-left: 10px solid var(--a1); }
+.item { border: 2px solid var(--rulec); padding: 8px 10px; margin: 8px 0; background: var(--bg); }
+.item-h { margin-bottom: 2px; }
+button.mini { padding: 1px 8px; font-size: 12px; }
+label.chk { display: inline-flex; gap: 4px; align-items: center; font-size: 14px; margin-right: 12px; }
+table.rules td { white-space: normal; vertical-align: middle; }
+table.rules select { min-width: 200px; }
+.pyramid { display: flex; flex-direction: column; align-items: center; gap: 3px; margin: 10px 0; }
+.pyr { padding: 5px 14px; border: 2px solid var(--rulec); background: var(--a3); color: #fff; display: flex; justify-content: space-between; gap: 18px; font-size: 13px; }
+.pyr.p0 { width: 28%; background: var(--a1); } .pyr.p1 { width: 40%; } .pyr.p2 { width: 52%; } .pyr.p3 { width: 64%; } .pyr.p4 { width: 76%; } .pyr.p5 { width: 88%; }
+@media (max-width: 900px) { .two, .three, .chron { grid-template-columns: 1fr; } .tabs a { padding: 7px 9px; } }
+.tabs { max-width: 100%; }
+tr.follow td { background: var(--a2); color: var(--ink); font-weight: 700; }

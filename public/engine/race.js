@@ -7,7 +7,7 @@
 import { makeRng, clamp, round1 } from './rng.js';
 import { PARAMS as P } from './params.js';
 import { COMPONENTS, TYRE_FAILURES } from './data/components.js';
-import { eraSpeedFactor, eraReliabilityFactor, eraPitFactor, eraRepairFactor } from './data/eras.js';
+import { eraSpeedFactor, eraReliabilityFactor, eraPitFactor, eraRepairFactor, eraSpreadFactor } from './data/eras.js';
 
 export function lapsFor(track, regs) {
   const n = Math.round(regs.raceKm / track.lengthKm);
@@ -30,7 +30,9 @@ function driverIndex(d, T) {
   ];
   let s = 0, w = 0;
   for (const [v, k] of parts) { s += v * k; w += k; }
-  return s / w;
+  const raw = s / w;
+  // the very best are only so much faster than the very good: diminishing returns above 72
+  return raw > 72 ? 72 + (raw - 72) * 0.6 : raw;
 }
 
 function carIndex(car, T) {
@@ -59,7 +61,7 @@ export function paceIndex(s, T, fuelKm, tyreWear, rain) {
 // A single flying lap used by qualifying and pre-qualifying (no wear, light fuel).
 export function qualifyingTime(s, T, year, rng, noise, rain) {
   const idx = paceIndex(s, T, 20, 0, rain || 0);
-  const t = baseLapSeconds(T, year) / (1 + (idx - 50) * P.pace.k);
+  const t = baseLapSeconds(T, year) / (1 + (idx - 50) * P.pace.k * eraSpreadFactor(year));
   return t * (1 + rng.gauss(0, noise * (1.4 - s.stats.consistency / 100))) + (rng.chance(clamp((100 - s.stats.focus) * 0.002, 0.02, 0.2)) ? rng.float(0.5, 4) : 0);
 }
 
@@ -73,6 +75,7 @@ function newCar(s, i, setup) {
   const quality = clamp(q / 100, 0.1, 1);
   return {
     s, id: s.entryId, pos0: i,
+    reliefView: s.relief ? { ...s, stats: s.relief.stats } : null,
     cum: i * P.start.gridGap,
     laps: 0,
     out: null,
@@ -99,8 +102,13 @@ export function* raceGenerator(setup) {
   const laps = setup.laps;
   const len = T.lengthKm;
   const totalKm = laps * len;
-  const baseLap = baseLapSeconds(T, year);
-  const relEra = eraReliabilityFactor(year);
+  const baseLap = baseLapSeconds(T, year) / (setup.speedMult || 1);
+  const relEra = eraReliabilityFactor(year) * (setup.relMult || 1);
+  const kEra = P.pace.k * eraSpreadFactor(year);
+  const scMode = setup.regs.safetyCar || 'none';
+  const quiet = !!setup.quiet;
+  const swapLap = setup.endurance ? Math.max(2, Math.floor(laps / 2)) : 0;
+  let sc = null, scCount = 0;
   const pitF = eraPitFactor(year), repF = eraRepairFactor(year);
 
   // weather: optional rain spell, decided up front so every speed agrees
@@ -131,16 +139,18 @@ export function* raceGenerator(setup) {
     if (running.length === 0) break;
     const frac = (lap - 1) / laps;
 
+    const scNow = sc && lap <= sc.until ? sc : null;
     for (const c of running) {
-      const s = c.s;
+      const s = swapLap && lap > swapLap && c.reliefView ? c.reliefView : c.s;
       let outNow = false;
       c.dt = 0;
       c.pitted = false;
 
       const idx = paceIndex(s, T, c.fuel, c.tyreWear, rainNow);
-      let t = baseLap / (1 + (idx - 50) * P.pace.k);
+      let t = baseLap / (1 + (idx - 50) * kEra);
       t *= 1 + rng.gauss(0, P.pace.noise * (1.4 - s.stats.consistency / 100));
-      const fat = clamp((frac - 0.15) / 0.85, 0, 1) * (1 - s.stats.fitness / 100) * P.fatigue.scale;
+      const stint = swapLap ? (lap <= swapLap ? (lap - 1) / swapLap : (lap - 1 - swapLap) / Math.max(1, laps - swapLap)) : frac;
+      const fat = clamp((stint - 0.15) / 0.85, 0, 1) * (1 - s.stats.fitness / 100) * P.fatigue.scale;
       t *= 1 + fat * P.fatigue.pace;
       if (c.limp) t *= 1 + c.limp;
       if (lap === 1) t += c.startLoss;
@@ -257,6 +267,17 @@ export function* raceGenerator(setup) {
         }
       }
 
+      if (swapLap && lap === swapLap && c.reliefView && !outNow) {
+        const sec = Math.round(22 * pitF * c.mech);
+        t += sec; c.pits++; c.pitted = true;
+        c.stops.push({ lap, why: 'driver change', sec });
+        lapEvents.push({ lap, id: c.id, kind: 'pit', text: `driver change to ${c.s.relief.driverName} (${sec}s)` });
+      }
+      if (scNow && !outNow) {
+        const slow = baseLap * (scNow.virtual ? 1.35 : 1.6);
+        if (t < slow) t = slow;
+        if (c.pitted && c.stops.length) t -= c.stops[c.stops.length - 1].sec * 0.4;
+      }
       c.dt = t;
       c.clean = clean;
     }
@@ -267,7 +288,11 @@ export function* raceGenerator(setup) {
     let ahead = null;
     for (const c of alive) {
       let next = c.cum + c.dt;
-      if (ahead && !c.pitted && !ahead.pitted) {
+      if (ahead && scNow && !scNow.virtual) {
+        next = Math.max(next, ahead.next + 0.8);
+      } else if (ahead && scNow) {
+        next = Math.max(next, ahead.next + 0.3);
+      } else if (ahead && !c.pitted && !ahead.pitted) {
         if (next < ahead.next) {
           // would pass: attempt
           const pace = (ahead.next - next) / baseLap;
@@ -308,8 +333,19 @@ export function* raceGenerator(setup) {
     for (const c of cars) if (c.out && c.laps === 0 && c.out.lap === lap) c.laps = lap - 1;
 
     const order = cars.filter((c) => !c.out).sort((a, b) => a.cum - b.cum || a.id - b.id);
-    lapOrders.push(order.map((c) => c.id));
+    // a safety car (or virtual one) follows serious incidents once the era has them
+    if (scMode !== 'none' && !scNow && lap < laps - 1 && lapEvents.some((e) => e.kind === 'out' && e.part === null)) {
+      const pc = scMode === 'pace' ? (scCount ? 0 : 0.35) : 0.65;
+      if (rng.next() < pc) {
+        const virtual = scMode === 'virtual' && rng.next() < 0.45;
+        sc = { until: lap + (virtual ? rng.int(2, 3) : rng.int(2, 4)), virtual };
+        scCount++;
+        lapEvents.push({ lap, id: 0, kind: 'safety', text: virtual ? 'Virtual safety car deployed' : (scMode === 'pace' ? 'The pace car leads the field' : 'Safety car deployed') });
+      }
+    }
+    if (!quiet) lapOrders.push(order.map((c) => c.id));
     for (const e of lapEvents) events.push(e);
+    if (quiet) continue;
     const leaderT = order.length ? order[0].cum : 0;
     yield {
       type: 'lap', lap, laps, rain: rainNow,
@@ -349,12 +385,14 @@ function classify(setup, cars, events, lapOrders, fastest, rain, baseLap, laps) 
     if (classified) pos++;
     const position = classified ? pos : null;
     if (position && position <= scoring.length && (r.ran || r.laps >= minLaps)) pts = scoring[position - 1];
+    if (c.s.noPoints) pts = 0;
+    if (setup.endurance && pts) pts = Math.round(pts * setup.endurance.multiplier * 10) / 10;
     classification.push({
       pos: position, entryId: c.id, number: c.s.number, driverId: c.s.driverId, teamId: c.s.teamId, brandId: c.s.brandId,
       laps: r.laps, time: r.time === null ? null : round1(r.time), status,
       reason: c.out ? c.out.reason : null, part: c.out ? c.out.part : null, outLap: c.out ? c.out.lap : null,
       points: pts, pits: c.pits, grid: c.pos0 + 1, bestLap: c.bestLap < 1e8 ? round1(c.bestLap) : null,
-      limp: c.limpWhy,
+      limp: c.limpWhy, reliefDriverId: c.s.relief ? c.s.relief.driverId : null, local: !!c.s.noPoints,
     });
   }
   // a retiree who completed enough distance is classified behind finishers: keep stable ordering
@@ -364,6 +402,7 @@ function classify(setup, cars, events, lapOrders, fastest, rain, baseLap, laps) 
     year: setup.year, round: setup.round, trackId: setup.track.id, laps, lengthKm: setup.track.lengthKm,
     distanceKm: Math.round(laps * setup.track.lengthKm * 10) / 10,
     rain: rain.level > 0 ? { start: rain.start, end: rain.end, level: Math.round(rain.level * 100) / 100 } : null,
+    endurance: setup.endurance ? true : false,
     starters: cars.length, finishers,
     winnerEntryId: winner ? winner.entryId : null,
     winnerTime: winner && winner.time ? winner.time : null,

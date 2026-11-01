@@ -8,6 +8,13 @@ import { prepareRound, applyRoundResult, runRound, runSeason, entryStandings, ad
 import { raceGenerator, simulateRace } from '../public/engine/race.js';
 import { serialize, deserialize, deepClone } from '../public/engine/save.js';
 import { TRACKS, tracksOpenIn } from '../public/engine/data/tracks.js';
+import { scoringFor } from '../public/engine/data/eras.js';
+import { describeCar } from '../public/engine/car.js';
+import { beginSeason } from '../public/engine/season.js';
+import { pendingItems, resolveItem, settleAll, setRegulation } from '../public/engine/governor.js';
+import { activeSeries, seriesTier } from '../public/engine/tiers.js';
+import { titleTables, pointsToWin } from '../public/engine/records.js';
+import * as pages from '../public/ui/pages.js';
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -177,7 +184,7 @@ test('season: round 1 everyone pre-qualifies, later top 10 full-season entries a
   eq(first.setup.starters.length, w.regs.gridCap);
   applyRoundResult(w, first, simulateRace(first.setup));
   const second = prepareRound(w);
-  const top10 = entryStandings(w).slice(0, 10).map((r) => r.id);
+  const top10 = entryStandings(w).filter((r) => entryById(w, r.id).type === 'full').slice(0, 10).map((r) => r.id);
   for (const id of second.prequal.exempt) { assert(entryById(w, id).type === 'full'); assert(top10.indexOf(id) >= 0); }
   assert(second.prequal.exempt.length <= 10);
   eq(second.setup.starters.length, w.regs.gridCap);
@@ -232,9 +239,9 @@ test('season: several years roll over cleanly and stay deterministic', () => {
 // ---- golden results: the same on every machine and browser ----
 test('golden: world and season results match the pinned values', () => {
   const w = createWorld({ seed: 'golden' });
-  eq(hashString(JSON.stringify(w)), '0a8c0b45', 'world creation changed (update pin only if intended)');
+  eq(hashString(JSON.stringify(w)), 'cf4925ef', 'world creation changed (update pin only if intended)');
   runSeason(w);
-  eq(hashString(JSON.stringify(w.season)), '76b28f5a', 'race simulation changed (update pin only if intended)');
+  eq(hashString(JSON.stringify(w.season)), '397b5d3a', 'race simulation changed (update pin only if intended)');
 });
 
 // ---- saves ----
@@ -324,6 +331,112 @@ test('save: a version 1 save is migrated and plays on', () => {
   eq(loaded.version, SAVE_VERSION);
   runSeason(loaded); advanceYear(loaded); runSeason(loaded);
   assert(loaded.history.seasons.length >= 2);
+});
+
+// ---- slice 3: the rest of the design document ----
+test('points: the scoring table follows the historical timeline', () => {
+  eq(scoringFor(1919).table.join(), '6,4,2');
+  eq(scoringFor(1950).table.length, 5);
+  eq(scoringFor(2012).table[0], 25);
+  eq(scoringFor(2040).table[0], 30);
+  const seen = new Set(LONG.w.history.seasons.filter((h) => h.scoring).map((h) => h.scoring.join()));
+  assert(seen.size >= 5, 'the points system should change several times in a century, saw ' + seen.size);
+});
+test('points: a title record carries wins, podiums, poles and the points on offer', () => {
+  const h = LONG.w.history.seasons.filter((x) => x.champion).slice(-1)[0];
+  assert(h.champion.wins !== undefined && h.champion.podiums !== undefined && h.champion.poles !== undefined, 'champion detail missing');
+  const p = pointsToWin(h);
+  assert(p.max > p.pts && p.pts > 0, 'points to win ' + JSON.stringify(p));
+});
+test('cars: technology arrives in the right decades and spreads', () => {
+  const w = LONG.w;
+  const years = (id) => w.teams.map((t) => t.tech && t.tech[id]).filter((y) => y);
+  const disc = years('discBrakes');
+  assert(disc.length >= 5 && disc.every((y) => y >= 1951), 'disc brakes ' + disc.join());
+  const mono = years('monocoque');
+  assert(mono.length >= 5 && mono.every((y) => y >= 1962), 'monocoque ' + mono.join());
+  const hyb = years('hybrid');
+  assert(hyb.every((y) => y >= 2009), 'hybrid ' + hyb.join());
+});
+test('cars: the description changes with the era', () => {
+  const w = LONG.w;
+  const e = activeEntries(w).find((x) => x.car);
+  const modern = describeCar(e.car, 2025, e.car.techs, w.regs).map((r) => r.join(': ')).join('|');
+  const old = describeCar(e.car, 1925, [], w.regs).map((r) => r.join(': ')).join('|');
+  assert(modern !== old && /disc|carbon|hybrid|turbo/i.test(modern + old) , 'no change');
+  assert(!/hybrid/.test(old), 'hybrid in 1925');
+});
+test('money: teams have owners, facilities, finances, and sponsors only from 1968', () => {
+  const w = createWorld({ seed: 'money' });
+  for (const t of w.teams.filter((x) => x.active)) {
+    assert(t.owner && t.owner.name && t.owner.goals, 'owner');
+    assert(t.facilities && t.finance && t.staff.principal, 'org');
+    eq(t.sponsors.length, 0, 'no sponsors in 1919');
+  }
+  const late = LONG.w;
+  assert(late.teams.some((t) => t.active && t.sponsors.length), 'no sponsors late in the century');
+  assert(late.teams.filter((t) => t.active).every((t) => Number.isFinite(t.finance.cash)), 'cash must be finite');
+});
+test('tiers: a ladder of lower series exists, grows, and has real champions', () => {
+  const w = LONG.w;
+  const act = activeSeries(w);
+  const kinds = new Set(act.map((s) => s.kind));
+  assert(kinds.has('continental') && kinds.has('feeder') && kinds.has('localDev'), 'kinds ' + [...kinds].join());
+  assert(act.some((s) => seriesTier(s, w.year) >= 3), 'no tier 3 or lower');
+  const champs = w.series.reduce((a, s) => a + s.history.filter((h) => h.champion).length, 0);
+  assert(champs > 100, 'few lower-tier champions: ' + champs);
+});
+test('governor: hands-on mode holds decisions for the player, then the season begins', () => {
+  const w = createWorld({ seed: 'hands', governor: 'expansionist', mode: 'hands' });
+  let waited = false;
+  for (let i = 0; i < 25 && !waited; i++) { runSeason(w); advanceYear(w); if (w.phase === 'offseason') waited = true; }
+  assert(waited, 'the governor never waited for the player in 25 years');
+  const items = pendingItems(w);
+  assert(items.length > 0);
+  const year = w.year;
+  resolveItem(w, items[0].id, items[0].options[0].id, 'you');
+  settleAll(w); beginSeason(w);
+  eq(w.phase, 'season'); eq(w.year, year);
+  runSeason(w);
+});
+test('governor: the player can set a rule and the governor leaves it alone', () => {
+  const w = createWorld({ seed: 'rules' });
+  setRegulation(w, 'scoring', [10, 6, 4, 3, 2, 1]);
+  for (let i = 0; i < 30; i++) { runSeason(w); advanceYear(w); }
+  eq(w.regs.scoring.join(), '10,6,4,3,2,1', 'the governor overwrote the player\'s points system');
+});
+test('records: titles are tallied and every page of the game draws', () => {
+  const w = LONG.w;
+  const tt = titleTables(w);
+  assert(tt.drivers.length > 20 && tt.brands.length > 8);
+  const bad = [];
+  const chk = (k, html) => { if (/undefined|NaN|\[object/.test(html)) bad.push(k); };
+  chk('dash', pages.pageDash(w)); chk('standings', pages.pageStandings(w)); chk('teams', pages.pageTeams(w)); chk('drivers', pages.pageDrivers(w)); chk('tiers', pages.pageTiers(w));
+  chk('industry', pages.pageIndustry(w, true)); chk('inbox', pages.pageInbox(w)); chk('rules', pages.pageRules(w)); chk('records', pages.pageRecords(w)); chk('chronicle', pages.pageChronicle(w, w.year - 1));
+  for (const t of w.teams) chk('team' + t.id, pages.pageTeam(w, t.id));
+  for (const b of w.brands) chk('brand' + b.id, pages.pageBrand(w, b.id));
+  for (const id of ['shell', 'bp', 'castrol', 'marlboro']) chk('sponsor' + id, pages.pageSponsor(w, id));
+  for (const tr of ['monza', 'spa', 'avus']) chk('track' + tr, pages.pageTrack(w, tr));
+  for (const s of w.series) chk('series' + s.id, pages.pageSeries(w, s.id));
+  for (const h of w.history.seasons) chk('season' + h.year, pages.pageChronicle(w, h.year));
+  assert(!bad.length, 'bad output in: ' + bad.slice(0, 8).join());
+});
+test('save: a version 2 save (no org, tiers or governor) is upgraded and plays on', () => {
+  const w = createWorld({ seed: 'mig2' });
+  runSeason(w); advanceYear(w); runSeason(w); advanceYear(w); runRound(w);
+  const old = deepClone(w);
+  old.version = 2;
+  for (const k of ['series', 'lowTeams', 'grass', 'governor', 'inbox', 'decisions', 'phase', 'titleSponsor', 'academies', 'epoch']) delete old[k];
+  old.regs = { scoring: [6, 4, 2], entries: { full: 4, partial: 2 }, exemptTop: 10, gridCap: 14, rounds: 8, raceKm: 300, minLaps: 5, chassisSupply: 'customer', commonOwnership: 'free', safetyCar: 'none', costCap: false, minWeight: false, touched: false };
+  for (const t of old.teams) { delete t.finance; delete t.facilities; delete t.sponsors; delete t.history; delete t.legacy; t.owner = { patience: 50, pockets: 50 }; }
+  for (const e of old.entries) { delete e.contract; }
+  for (const d of old.drivers) { delete d.career; delete d.rep; }
+  const loaded = deserialize(JSON.stringify({ format: 'msc-save', version: 2, world: old }), 'X');
+  eq(loaded.version, SAVE_VERSION);
+  assert(loaded.series.length > 0, 'no ladder after upgrade');
+  assert(loaded.teams.every((t) => t.finance && t.facilities));
+  runSeason(loaded); advanceYear(loaded); runSeason(loaded);
+  assert(pages.pageTeam(loaded, loaded.teams[0].id).length > 500);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

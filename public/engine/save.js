@@ -2,9 +2,12 @@
 // the world plus a small header. Races are deterministic functions of the seed and
 // the state, so nothing about random streams needs saving.
 
-import { SAVE_VERSION, ensureCohorts } from './world.js';
-import { defaultRegs, eraFor } from './data/eras.js';
+import { makeRng } from './rng.js';
+import { SAVE_VERSION, ensureCohorts, activeEntries, teamById, driverById } from './world.js';
+import { defaultRegs, eraFor, scoringFor } from './data/eras.js';
 import { fillVacantSeats } from './industry.js';
+import { initTeamOrg, initBrandOrg, signContract } from './org.js';
+import { bootstrapTiers, startTierSeasons, tiersAfterRound } from './tiers.js';
 
 export function serialize(world, device = '') {
   world.meta = world.meta || {};
@@ -36,8 +39,6 @@ export function migrate(world) {
       t.endedYear = t.endedYear || null;
     }
     for (const e of world.entries) if (e.active === undefined) e.active = true;
-    // the old regulations were the 1919 defaults; the next year turn applies the new era's
-    world.regs = { ...defaultRegs(world.year), ...world.regs, eraFrom: world.regs.eraFrom || eraFor(world.startYear || 1919).from, touched: !!world.regs.touched };
     for (const h of world.history.seasons) {
       if (!h.champion && !h.cancelled && (!h.results || !h.results.length)) h.empty = true;
       if (!h.results) h.results = [];
@@ -45,6 +46,38 @@ export function migrate(world) {
     }
     ensureCohorts(world, world.year + 16);
     fillVacantSeats(world, world.year);
+  }
+
+  if (world.version < 3) {
+    const year = world.year;
+    const touched = !!(world.regs && world.regs.touched);
+    const old = world.regs || {};
+    world.regs = touched ? { ...defaultRegs(year), ...old } : { ...defaultRegs(year), exemptTop: old.exemptTop || 10, raceKm: old.raceKm || 300, minLaps: old.minLaps || 5 };
+    world.regs.eraFrom = eraFor(year).from;
+    world.regs.overridden = world.regs.overridden || {};
+    world.regs.scoringFrom = scoringFor(year).from;
+    world.epoch = world.epoch || 0;
+    world.series = []; world.lowTeams = []; world.grass = {};
+    world.governor = world.governor || { personality: 'traditionalist', mode: 'auto', manual: {} };
+    world.inbox = []; world.decisions = []; world.phase = 'season'; world.titleSponsor = null; world.academies = {};
+    world.counters = { entry: 0, driver: 0, team: 0, series: 0, lowTeam: 0, decision: 0, ...world.counters };
+    for (const b of world.brands) { initBrandOrg(b, makeRng(world.seed, 'brand-org', b.id)); if (b.health === undefined) b.health = b.strength; }
+    for (const t of world.teams) {
+      t.owner = t.owner && t.owner.fortune !== undefined ? t.owner : { patience: (t.owner && t.owner.patience) || 50, pockets: (t.owner && t.owner.pockets) || 50 };
+      initTeamOrg(world, t, makeRng(world.seed, 'org-init', t.id), year);
+    }
+    for (const e of world.entries) {
+      if (e.active && e.driverId != null && !e.contract) { const d = driverById(world, e.driverId); if (d) signContract(world, e, d, year, makeRng(world.seed, 'mig-contract', e.id)); }
+      if (e.car) { e.car.designYear = e.car.designYear || e.car.year; e.car.maturity = e.car.maturity || 0; e.car.techs = e.car.techs || []; e.car.epoch = 0; }
+    }
+    for (const d of world.drivers) { if (d.rep === undefined) d.rep = Math.min(90, 10 + (d.wins || 0) * 2 + (d.titles || 0) * 12); if (d.fans === undefined) d.fans = 0; if (d.academy === undefined) d.academy = null; }
+    // the ladder the world would have by now
+    bootstrapTiers(world, year);
+    startTierSeasons(world, year);
+    if (world.season && world.season.round > 0) tiersAfterRound(world);
+    // in an old save the champion records carry no wins and podiums: the Chronicle derives them
+    for (const t of world.teams) void teamById(world, t.id);
+    void activeEntries;
   }
   world.version = SAVE_VERSION;
   return world;

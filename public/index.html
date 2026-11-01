@@ -26,25 +26,45 @@
 <main>
   <section id="welcome" class="panel">
     <h2>Run a championship from 1919</h2>
-    <p>One series, one seed, a hundred years. Start a new series, then watch each race lap by lap, or let the seasons run themselves. Every race is a pure function of the seed, so the result is the same however fast you watch.</p>
+    <p>You run the governing body of one motorsport championship, from 1919 for a hundred years or more. Teams, makers, sponsors and drivers come and go; the rules and technology change with the era; a ladder of lower series grows beneath you. Watch every race lap by lap, or let seasons run themselves.</p>
     <div class="row">
       <label>Seed <input id="seed" value="" placeholder="any word or number"></label>
+      <label>Governor
+        <select id="new-gov">
+          <option value="traditionalist">Traditionalist: follows the era, resists change</option>
+          <option value="cautious">Cautious: protects the sport</option>
+          <option value="expansionist">Expansionist: more teams, series, regions</option>
+          <option value="commercial">Commercial: money, fans, spectacle</option>
+        </select>
+      </label>
+      <label>Mode
+        <select id="new-mode">
+          <option value="auto">Fully autonomous: the governor decides everything</option>
+          <option value="hands">Hands-on: you approve entries, rules, new series</option>
+        </select>
+      </label>
       <button id="btn-start" class="primary">Start 1919</button>
     </div>
-    <p class="small">Saves are single files. Use <b>Save to file</b> to move a series between computers. The page also keeps an automatic copy in this browser.</p>
+    <p class="small">Saves are single files. Use <b>Save to file</b> to move a series between computers. The page also keeps an automatic copy in this browser. Older saves load and are upgraded.</p>
     <div id="resume" class="small"></div>
   </section>
 
   <section id="game" hidden>
-    <div class="tabs" id="tabs">
-      <button data-tab="race" class="on">Race</button>
-      <button data-tab="standings">Standings</button>
-      <button data-tab="entries">Entries</button>
-      <button data-tab="results">Results</button>
-      <button data-tab="chronicle">Chronicle</button>
-    </div>
+    <nav class="tabs" id="tabs">
+      <a href="#/race" data-tab="race">Race</a>
+      <a href="#/standings" data-tab="standings">Standings</a>
+      <a href="#/teams" data-tab="teams">Teams</a>
+      <a href="#/drivers" data-tab="drivers">Drivers</a>
+      <a href="#/tiers" data-tab="tiers">Tiers</a>
+      <a href="#/industry" data-tab="industry">Makers &amp; tech</a>
+      <a href="#/inbox" data-tab="inbox">Approvals <span id="badge" class="badge" hidden></span></a>
+      <a href="#/rules" data-tab="rules">Rules</a>
+      <a href="#/chronicle" data-tab="chronicle">Chronicle</a>
+      <a href="#/records" data-tab="records">Records</a>
+    </nav>
 
-    <div id="tab-race" class="tabpane">
+    <div id="tab-race">
+      <div id="offseason" class="panel notice" hidden></div>
       <div class="panel">
         <h2 id="race-title">Next race</h2>
         <div id="race-sub" class="small"></div>
@@ -54,6 +74,7 @@
           <button id="btn-watch3">Events only</button>
           <button id="btn-skip">Run race instantly</button>
           <button id="btn-pause" disabled>Pause</button>
+          <select id="follow" title="Event mode prioritises this driver's car"></select>
           <span class="sep"></span>
           <button id="btn-season">Run rest of season</button>
           <button id="btn-next-year" hidden>Start next season</button>
@@ -66,35 +87,10 @@
         <div class="panel"><h3>Race feed</h3><ol id="feed" class="feed"></ol></div>
       </div>
       <div class="panel" id="last-race" hidden><h3 id="last-title"></h3><table id="classification"></table><div id="last-retire" class="small"></div></div>
+      <div id="dash"></div>
     </div>
 
-    <div id="tab-standings" class="tabpane" hidden>
-      <div class="three">
-        <div class="panel"><h3>Drivers</h3><table id="st-drivers"></table></div>
-        <div class="panel"><h3>Entries</h3><table id="st-entries"></table></div>
-        <div class="panel"><h3>Makers</h3><table id="st-brands"></table></div>
-      </div>
-    </div>
-
-    <div id="tab-entries" class="tabpane" hidden>
-      <div class="panel"><h3>Entry list</h3><table id="entry-table"></table></div>
-      <div class="panel" id="driver-card" hidden></div>
-    </div>
-
-    <div id="tab-results" class="tabpane" hidden>
-      <div class="panel"><h3>Season calendar</h3><table id="cal-table"></table></div>
-      <div class="panel"><h3>Race reports</h3><div id="reports"></div></div>
-    </div>
-
-    <div id="tab-chronicle" class="tabpane" hidden>
-      <div class="chron">
-        <aside class="panel"><h3>Seasons</h3><ul id="season-list" class="slist"></ul></aside>
-        <section class="panel" id="season-detail"></section>
-      </div>
-      <div class="panel"><h3>The industry today</h3><table id="industry"></table></div>
-      <div class="panel"><h3>Coming through (talent unknown until they are of age)</h3><table id="cohort"></table></div>
-      <div class="panel"><h3>Regulations in force</h3><div id="regs" class="small"></div></div>
-    </div>
+    <div id="view" hidden></div>
   </section>
 </main>
 <footer class="small">Deterministic engine: the same seed and the same choices always give the same history, on any computer.</footer>
