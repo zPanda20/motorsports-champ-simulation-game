@@ -7,7 +7,7 @@
 
 import { brandColors, hashColors } from '../engine/data/brands.js';
 import { teamById, brandById } from '../engine/world.js';
-import { logoFor } from './assets.js';
+import { logoFor, divisionLogo } from './assets.js';
 import { esc } from './common.js';
 
 const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
@@ -47,6 +47,22 @@ export function teamPalette(w, teamId) {
   return brandPalette(t.brandId);
 }
 
+// the colours of one identity of a team (a season of its history, or a past identity): a works identity wears
+// its maker's colours, a privateer one the livery it had then
+export function identityPalette(id) {
+  if (id.kind === 'works') return brandPalette(id.brandId);
+  if (id.colors && norm(id.colors[0]) && norm(id.colors[1])) return pair(id.colors, id.name || 'x');
+  return brandPalette(id.brandId);
+}
+export function identityBadge(w, id, year) {
+  if (id.kind === 'works') {
+    const src = divisionLogo(id.brandId, id.name, year);
+    if (src) return `<img class="mk-icon" src="${src}" alt="" loading="lazy">`;
+    return brandMark(w, id.brandId, year);
+  }
+  return swatch(identityPalette(id));
+}
+
 // a lower-tier team has no livery of its own: use its car maker's colours, or a colour from its name
 export function lowTeamPalette(w, lt) {
   if (!lt) return pair(null, 'low');
@@ -75,11 +91,21 @@ export function brandMark(w, brandId, year, big) {
   return `<span class="${big ? 'mono mono-big' : 'mono'}" style="--c1:${pal[0]};--c2:${pal[1]};--ci:${inkOn(pal[0])}" aria-hidden="true">${esc(initials(b.name))}</span>`;
 }
 
+// the mark of a works team: its performance division's badge when it runs under that name (Toyota Gazoo,
+// Honda Mugen), else its maker's badge or monogram
+export function teamMark(w, teamId, big) {
+  const t = teamById(w, teamId);
+  if (!t || t.kind !== 'works') return '';
+  const src = divisionLogo(t.brandId, t.name, w.year);
+  if (src) return `<img class="${big ? 'mk-hero' : 'mk-icon'}" src="${src}" alt="" loading="lazy">`;
+  return brandMark(w, t.brandId, w.year, big);
+}
+
 // what goes in front of a team's name: its maker's badge for a works team, a livery chip otherwise
 export function teamBadge(w, teamId) {
   const t = teamById(w, teamId);
   if (!t) return '';
-  return t.kind === 'works' ? brandMark(w, t.brandId) : swatch(teamPalette(w, teamId));
+  return t.kind === 'works' ? teamMark(w, teamId) : swatch(teamPalette(w, teamId));
 }
 
 // ---- styles ----

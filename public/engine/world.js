@@ -17,7 +17,7 @@ import { initTeamOrg, initBrandOrg, avgFac, budgetBase, signContract } from './o
 import { adoptionShares, usableTechs, techBonus } from './techs.js';
 import { regionOf } from './data/regions.js';
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 const TYRE_MAKERS = [
   { id: 'dunlop', name: 'Dunlop', country: 'GB', founded: 1889 },
@@ -56,19 +56,19 @@ export function activeDrivers(world) {
 
 // ---------------------------------------------------------------- people
 
-function staffMember(rng, nat, used, centre) {
+function staffMember(rng, nat, used, centre, year) {
   const gender = rng.chance(0.5) ? 'F' : 'M';
-  const nm = makePersonName(rng, nat, used, gender);
+  const nm = makePersonName(rng, nat, used, gender, typeof year === 'number' ? year - 42 : undefined);
   return { name: nm.full, nat, gender, rating: Math.round(clamp(rng.gauss(centre, 11), 18, 92)) };
 }
 
-export function makeStaff(rng, nat, used, wealth) {
+export function makeStaff(rng, nat, used, wealth, year) {
   const c = 40 + wealth * 22;
   return {
-    principal: staffMember(rng, nat, used, c),
-    techDirector: staffMember(rng, nat, used, c),
-    raceEngineer: staffMember(rng, nat, used, c),
-    chiefMechanic: staffMember(rng, nat, used, c),
+    principal: staffMember(rng, nat, used, c, year),
+    techDirector: staffMember(rng, nat, used, c, year),
+    raceEngineer: staffMember(rng, nat, used, c, year),
+    chiefMechanic: staffMember(rng, nat, used, c, year),
   };
 }
 
@@ -170,7 +170,7 @@ export function activateWorks(world, brand, rng, year) {
       id: ++world.counters.team, name: worksTeamName(world, brand, year, rng.fork('name')), nat: brand.country, kind: 'works', brandId: brand.id,
       origin: { type: 'manufacturer', year, by: brand.name },
       tyreId: rng.pick(world.tyres.map((t) => t.id)), wealth: Math.round(wealth * 100) / 100,
-      staff: makeStaff(rng, brand.country, usedNames(world), wealth),
+      staff: makeStaff(rng, brand.country, usedNames(world), wealth, year),
       control: rng.pick(['principal', 'engineer', 'driver']),
       owner: { patience: rng.int(30, 90), pockets: Math.round(wealth * 100) },
       active: true, titles: 0, wins: 0, foundedYear: year, endedYear: null,
@@ -199,10 +199,10 @@ export function addPrivateerTeam(world, rng, year, opts = {}) {
   const names = new Set(world.teams.map((t) => t.name));
   const wealth = opts.wealth !== undefined ? opts.wealth : clamp(rng.gauss(opts.rich ? 0.6 : 0.35, 0.12), 0.1, opts.rich ? 0.9 : 0.7);
   const team = {
-    id: ++world.counters.team, name: opts.name || makeTeamName(rng, nat, names), nat, kind: 'privateer',
+    id: ++world.counters.team, name: opts.name || makeTeamName(rng, nat, names, year), nat, kind: 'privateer',
     brandId: opts.brandId || pickSupplier(world, rng, null),
     tyreId: rng.pick(world.tyres.map((t) => t.id)), wealth: Math.round(wealth * 100) / 100,
-    staff: makeStaff(rng, nat, used, wealth),
+    staff: makeStaff(rng, nat, used, wealth, year),
     control: rng.pick(['principal', 'engineer', 'driver']),
     owner: { patience: rng.int(25, 80), pockets: Math.round(wealth * 100) },
     active: true, titles: 0, wins: 0, foundedYear: year, endedYear: null,
@@ -231,6 +231,9 @@ const NATIONAL = {
   BE: ['#e8c71a', '#111111'], NL: ['#f26b1d', '#1e3f8a'], CH: ['#c8102e', '#f2f2f2'], SE: ['#1b5aa6', '#f2c200'], AT: ['#c8102e', '#f2f2f2'],
   AU: ['#0b7a3b', '#f4c20d'], JP: ['#c8102e', '#f2f2f2'], KR: ['#003478', '#f2f2f2'], ES: ['#c8102e', '#f4c20d'], AR: ['#74acdf', '#f2f2f2'],
   BR: ['#0b7a3b', '#f4c20d'], CA: ['#c8102e', '#f2f2f2'],
+  IE: ['#169b62', '#ff883e'], PT: ['#006600', '#ff0000'], FI: ['#f2f2f2', '#003580'], DK: ['#c8102e', '#f2f2f2'], NO: ['#ba0c2f', '#00205b'],
+  PL: ['#f2f2f2', '#dc143c'], MX: ['#006847', '#ce1126'], CO: ['#fcd116', '#003893'], ZA: ['#007a4d', '#ffb612'], NZ: ['#101820', '#c8c8c8'],
+  IN: ['#ff9933', '#138808'], CN: ['#de2910', '#ffde00'],
 };
 const PAINTS = [['#d62828', '#f7f7f7'], ['#1d3557', '#f1c453'], ['#2a9d8f', '#264653'], ['#f77f00', '#1b1b1b'], ['#6a4c93', '#f2e9e4'], ['#0b6e4f', '#f2c14e'], ['#e63946', '#1d3557'], ['#118ab2', '#ffd166'], ['#7b2cbf', '#f3f3f3'], ['#222222', '#f4c20d'], ['#ef476f', '#073b4c'], ['#8ac926', '#222222']];
 export function makeLivery(rng, nat, year) {

@@ -8,9 +8,11 @@
 // via:        'merge' = does not exist until a corporate merger creates it (data/corp.js)
 // until:      the last year the brand exists on its own (it merges into another)
 // names:      the name changes with the years, [[from, name], ...]
+// small:      a small engine builder: it cannot build the best engine of the year unless a big
+//             maker partners with it (Ford-Cosworth, Mercedes-Ilmor), see engine/corp.js
 // perf:       the performance division that runs the works team once it exists, [[from, name], ...]
 //
-// Ferrari and McLaren are not in this list on purpose: teams like them have to be
+// Ferrari, McLaren, Brabham and Tesla are not in this list on purpose: teams like them have to be
 // created by the story of the series (a champion founding a team, an engineer founding a
 // constructor), see engine/founders.js.
 
@@ -63,19 +65,17 @@ export const BRANDS = [
   B('volkswagen', 'Volkswagen', 'DE', 1937, ['#001e50', '#5da9e9'], { perf: [[1972, 'Volkswagen Motorsport']] }),
   B('nissan', 'Nissan', 'JP', 1933, ['#c3002f', '#cfd2d6'], { perf: [[1984, 'Nissan Nismo']] }),
   B('toyota', 'Toyota', 'JP', 1937, ['#eb0a1e', '#f3f3f3'], { perf: [[1954, 'Toyota TRD'], [2007, 'Toyota Gazoo TRD']] }),
-  B('brm', 'BRM', 'GB', 1945, ['#115c36', '#e8e8e8'], { engineOnly: [[1945, 9999]] }),
+  B('brm', 'BRM', 'GB', 1945, ['#115c36', '#e8e8e8'], { small: true, engineOnly: [[1945, 9999]] }),
   B('matra', 'Matra', 'FR', 1945, ['#1c3fa0', '#f3f3f3']),
   B('cooper', 'Cooper', 'GB', 1947, ['#1c7a45', '#111111']),
   B('honda', 'Honda', 'JP', 1948, ['#d4121a', '#f3f3f3'], { perf: [[1973, 'Honda Mugen']] }),
   B('vanwall', 'Vanwall', 'GB', 1949, ['#0f5a38', '#c8d4c0']),
   B('lotus', 'Lotus', 'GB', 1952, ['#f2c200', '#0f5a38']),
   B('subaru', 'Subaru', 'JP', 1953, ['#1f4fa3', '#f2c200'], { perf: [[1988, 'Subaru STI']] }),
-  B('brabham', 'Brabham', 'AU', 1960, ['#0b6d3a', '#f2c200']),
   B('lamborghini', 'Lamborghini', 'IT', 1963, ['#e0b100', '#111111'], { perf: [[2013, 'Lamborghini Squadra Corse']] }),
   B('hyundai', 'Hyundai', 'KR', 1967, ['#003478', '#9bc0ea'], { perf: [[1998, 'Hyundai Motorsport'], [2015, 'Hyundai N Motorsport']] }),
   B('ligier', 'Ligier', 'FR', 1969, ['#1d56b8', '#f3f3f3']),
   B('lexus', 'Lexus', 'JP', 1989, ['#8a8f98', '#1b1b1b']),
-  B('tesla', 'Tesla', 'US', 2003, ['#cc0000', '#1b1b1b']),
   B('genesis', 'Genesis', 'KR', 2015, ['#1b1b1b', '#b08d57'], { perf: [[2023, 'Genesis Magma']] }),
   B('polestar', 'Polestar', 'SE', 2017, ['#1b1b1b', '#e8a33a']),
   // makers added so that real corporate groups can form on the real timeline
@@ -89,10 +89,10 @@ export const BRANDS = [
   B('kia', 'Kia', 'KR', 1944, ['#bb162b', '#e8e8e8']),
   B('alpine', 'Alpine', 'FR', 1955, ['#0b4fb8', '#ec6ca8']),
   // engine builders that never run a works team
-  B('climax', 'Coventry Climax', 'GB', 1950, ['#4e5d3a', '#e8e0c0'], { engineOnly: [[1950, 9999]] }),
-  B('cosworth', 'Cosworth', 'GB', 1958, ['#1e3f7a', '#e4b300'], { engineOnly: [[1958, 9999]] }),
-  B('judd', 'Judd', 'GB', 1971, ['#5a5a5a', '#e4572e'], { engineOnly: [[1971, 9999]] }),
-  B('ilmor', 'Ilmor', 'GB', 1984, ['#2b2b2b', '#e4a11b'], { engineOnly: [[1984, 9999]] }),
+  B('climax', 'Coventry Climax', 'GB', 1950, ['#4e5d3a', '#e8e0c0'], { small: true, engineOnly: [[1950, 9999]] }),
+  B('cosworth', 'Cosworth', 'GB', 1958, ['#1e3f7a', '#e4b300'], { small: true, engineOnly: [[1958, 9999]] }),
+  B('judd', 'Judd', 'GB', 1971, ['#5a5a5a', '#e4572e'], { small: true, engineOnly: [[1971, 9999]] }),
+  B('ilmor', 'Ilmor', 'GB', 1984, ['#2b2b2b', '#e4a11b'], { small: true, engineOnly: [[1984, 9999]] }),
 ];
 
 export const BRAND_DEF = Object.fromEntries(BRANDS.map((b) => [b.id, b]));
@@ -105,6 +105,8 @@ export function atYear(timeline, year, fallback) {
   return v;
 }
 export const brandNameAt = (def, year) => atYear(def.names, year, def.name);
+
+export const isSmallBuilder = (brandId) => !!(BRAND_DEF[brandId] && BRAND_DEF[brandId].small);
 
 // true while the maker is only allowed to build engines for others
 export function engineOnlyAt(brandId, year) {

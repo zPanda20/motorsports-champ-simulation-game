@@ -3,10 +3,11 @@
 // whole cars, pooled development) and the names of works teams.
 
 import { makeRng, clamp } from './rng.js';
-import { BRAND_DEF, brandNameAt, atYear } from './data/brands.js';
+import { BRAND_DEF, brandNameAt, atYear, isSmallBuilder, engineOnlyAt } from './data/brands.js';
 import { MERGERS, RENAMES, GROUPS, GROUP_BY_ID, groupName, groupOfBrand, worksStyles } from './data/corp.js';
 import { logEvent, brandById, teamById, newBrandObject, deactivateTeam, syncEntries } from './world.js';
 import { closeTeam } from './org.js';
+import { retireIdentity } from './identity.js';
 
 const r3 = (x) => Math.round(x * 1000) / 1000;
 
@@ -60,6 +61,8 @@ function mergeWorksTeams(world, teams, into, year, rng) {
   keep.fans = Math.max(keep.fans, ...others.map((o) => o.fans));
   keep.finance.cash = Math.round(keep.finance.cash + others.reduce((a, o) => a + Math.max(0, o.finance.cash), 0));
   keep.merged = (keep.merged || []).concat(others.map((o) => o.id));
+  const mergedName = worksTeamName(world, into, year, rng.fork('name'));
+  retireIdentity(world, keep, year, 'merged', mergedName);
   for (const o of others) {
     keep.titles += o.titles; keep.wins += o.wins;
     if (o.legacy) keep.legacy.peakPrestige = Math.max(keep.legacy.peakPrestige, o.legacy.peakPrestige);
@@ -67,8 +70,9 @@ function mergeWorksTeams(world, teams, into, year, rng) {
     o.mergedInto = keep.id;
   }
   const old = keep.name;
+  keep.idTitles0 = keep.titles; keep.idWins0 = keep.wins; // the merged team starts counting from here
   keep.brandId = into.id;
-  keep.name = worksTeamName(world, into, year, rng.fork('name'));
+  keep.name = mergedName;
   keep.names = keep.names || [old];
   if (keep.names.indexOf(keep.name) < 0) keep.names.push(keep.name);
   keep.nat = into.country; keep.region = keep.region || null;
@@ -150,8 +154,8 @@ function setCorp(world, year, silent) {
 
 export const activeProgrammes = (world) => (world.programmes || []).filter((p) => !p.ended);
 export const programmeOf = (world, brandId) => activeProgrammes(world).find((p) => p.leadId === brandId || p.partnerId === brandId) || null;
-const KIND_TEXT = { engine: 'share an engine', chassis: 'share a chassis', full: 'run the same car under two badges', pool: 'pool their development' };
-export const PROGRAMME_LABEL = { engine: 'shared engine', chassis: 'shared chassis', full: 'same car, two badges', pool: 'pooled development' };
+const KIND_TEXT = { engine: 'share an engine', chassis: 'share a chassis', full: 'run the same car under two badges', pool: 'pool their development', deal: 'partner on engines' };
+export const PROGRAMME_LABEL = { engine: 'shared engine', chassis: 'shared chassis', full: 'same car, two badges', pool: 'pooled development', deal: 'works engine partnership' };
 
 function hasWorks(world, brand) { return world.teams.some((t) => t.kind === 'works' && t.active && t.brandId === brand.id); }
 
@@ -163,12 +167,43 @@ function programmesYear(world, year, rng) {
     const sameGroup = lead && partner && lead.corp && lead.corp === partner.corp;
     const both = lead && partner && hasWorks(world, lead) && hasWorks(world, partner);
     const r = rng.fork('end', p.id);
+    if (p.kind === 'deal') {
+      // a big maker's partnership with an engine builder ends when either leaves, or now and then
+      const live = lead && partner && lead.status === 'racing' && partner.status === 'racing' && hasWorks(world, lead) && !engineOnlyAt(lead.id, year);
+      if (!live || r.chance(0.08)) {
+        p.ended = year;
+        if (lead && partner) logEvent(world, year, 'brand', `${lead.name} and ${partner.name} end their engine partnership.`);
+      } else {
+        p.quality = r3(clamp(p.quality + r.gauss(0, 0.012), -0.06, 0.1));
+        lead.health = r3(clamp((lead.health === undefined ? lead.strength : lead.health) + 0.012, 0.05, 1)); // it saves the maker money
+      }
+      continue;
+    }
     if (!sameGroup || !both || r.chance(0.07)) {
       p.ended = year;
       if (lead && partner) logEvent(world, year, 'brand', `${lead.name} and ${partner.name} end their ${PROGRAMME_LABEL[p.kind]} programme${!both ? ' as one of them leaves the grid' : ''}.`);
       continue;
     }
     p.quality = r3(clamp(p.quality + r.gauss(0, 0.012), -0.1, 0.12));
+  }
+  // starts: a big maker teams up with a small engine builder (the Ford-Cosworth, Mercedes-Ilmor kind of deal)
+  if (year >= 1960) {
+    const smalls = world.brands.filter((b) => isSmallBuilder(b.id) && b.status === 'racing' && !programmeOf(world, b.id)).sort((a, b) => a.id.localeCompare(b.id));
+    const leads = world.brands.filter((b) => b.status === 'racing' && !isSmallBuilder(b.id) && !engineOnlyAt(b.id, year) && hasWorks(world, b) && !programmeOf(world, b.id)).sort((a, b) => a.id.localeCompare(b.id));
+    for (const lead of leads) {
+      if (!smalls.length) break;
+      if (programmeOf(world, lead.id)) continue;
+      const h = lead.health === undefined ? lead.strength : lead.health;
+      // makers short of money or engine strength are likelier to look for a partner
+      const p = 0.022 + (0.5 - Math.min(0.5, lead.engineStrength)) * 0.05 + (h < 0.5 ? 0.02 : 0);
+      const r = rng.fork('deal', lead.id);
+      if (!r.chance(p)) continue;
+      const small = r.weighted(smalls, (b) => 0.3 + b.engineStrength);
+      smalls.splice(smalls.indexOf(small), 1);
+      const quality = r3(clamp(r.gauss(0.02, 0.04), -0.05, 0.09));
+      world.programmes.push({ id: world.programmes.length + 1, groupId: null, kind: 'deal', leadId: lead.id, partnerId: small.id, since: year, quality, ended: null });
+      logEvent(world, year, 'brand', `${lead.name} and ${small.name} partner on engines: ${small.name} builds them, ${lead.name} saves on development${quality < -0.02 ? ', though insiders doubt it will work' : ''}.`);
+    }
   }
   // starts: two sisters from the same group both racing with works teams
   const byGroup = {};
@@ -191,9 +226,24 @@ function programmesYear(world, year, rng) {
 }
 
 // What a maker's car is really built from this year, once its group's programmes apply.
+// A small engine builder (Cosworth, Judd, Ilmor, Climax, BRM) is never the best engine of the year on its
+// own: it stays a little below the best big maker, unless a big maker has partnered with it.
+export const SMALL_BUILDER_MARGIN = 0.04;
+function bestBigEngine(world) {
+  let best = 0.5;
+  for (const b of world.brands) if (b.status === 'racing' && !isSmallBuilder(b.id) && b.engineStrength > best) best = b.engineStrength;
+  return best;
+}
+
 export function effectiveBrand(world, brand) {
   const p = programmeOf(world, brand.id);
+  const small = isSmallBuilder(brand.id);
+  if (small && !(p && p.kind === 'deal')) {
+    const cap = bestBigEngine(world) - SMALL_BUILDER_MARGIN;
+    return brand.engineStrength > cap ? { ...brand, engineStrength: Math.max(0.12, cap) } : brand;
+  }
   if (!p) return brand;
+  if (p.kind === 'deal') return dealBrand(world, brand, p);
   const lead = brandById(world, p.leadId), partner = brandById(world, p.partnerId);
   if (!lead || !partner) return brand;
   const q = p.quality;
@@ -213,6 +263,18 @@ export function effectiveBrand(world, brand) {
   if (p.kind === 'engine' || p.kind === 'full') { o.engineStrength = cl(lead.engineStrength + q); o.reliability = cl(brand.reliability * 0.5 + lead.reliability * 0.5 + q * 0.5); }
   if (p.kind === 'chassis' || p.kind === 'full') o.chassisStrength = cl(lead.chassisStrength + q);
   if (p.kind === 'full') o.reliability = cl(lead.reliability + q);
+  return o;
+}
+
+// the engine of a partnership: the builder is lifted towards its partner's level, and the big maker runs that engine
+function dealBrand(world, brand, p) {
+  const lead = brandById(world, p.leadId), small = brandById(world, p.partnerId);
+  if (!lead || !small) return brand;
+  const cl = (v) => clamp(v, 0.12, 0.97);
+  const boosted = cl(Math.max(small.engineStrength, lead.engineStrength * 0.85) + 0.05 + p.quality);
+  const o = { ...brand };
+  if (brand.id === small.id) { o.engineStrength = boosted; o.reliability = cl(Math.max(small.reliability, lead.reliability * 0.9) + p.quality * 0.5); return o; }
+  o.engineStrength = cl(brand.engineStrength * 0.5 + boosted * 0.5);
   return o;
 }
 

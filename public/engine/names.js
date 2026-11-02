@@ -4,17 +4,23 @@
 // Generated full names are checked against a list of real drivers and re-rolled.
 
 import { makeRng } from './rng.js';
+import {
+  FIRST_MID, FIRST_MODERN, FIRST_F_MID, FIRST_F_MODERN, FAMILY_EXTRA, NEW_NATIONALITIES, NEW_FIRST, NEW_FAMILY,
+  W1919_X, W2020_X, TEAM_WORDS, TEAM_PLACES,
+} from './data/names-ext.js';
 
-export const NATIONALITIES = ['GB', 'US', 'FR', 'IT', 'DE', 'ES', 'NL', 'BE', 'CH', 'SE', 'AT', 'AR', 'AU', 'BR', 'CA', 'JP', 'KR'];
+const BASE_NATIONALITIES = ['GB', 'US', 'FR', 'IT', 'DE', 'ES', 'NL', 'BE', 'CH', 'SE', 'AT', 'AR', 'AU', 'BR', 'CA', 'JP', 'KR'];
+export const NATIONALITIES = BASE_NATIONALITIES.concat(NEW_NATIONALITIES);
 
 // More European in 1919, wider later. Linear blend between the two tables.
-const W1919 = { GB: 22, US: 18, FR: 20, IT: 17, DE: 9, ES: 3, NL: 2, BE: 4, CH: 2, SE: 1, AT: 1, AR: 0.4, AU: 0.4, BR: 0.2, CA: 0.0, JP: 0, KR: 0 };
-const W2020 = { GB: 10, US: 11, FR: 7, IT: 8, DE: 8, ES: 6, NL: 4, BE: 3, CH: 2, SE: 3, AT: 2, AR: 5, AU: 6, BR: 8, CA: 5, JP: 6, KR: 3 };
+const W1919 = { GB: 22, US: 18, FR: 20, IT: 17, DE: 9, ES: 3, NL: 2, BE: 4, CH: 2, SE: 1, AT: 1, AR: 0.4, AU: 0.4, BR: 0.2, CA: 0.0, JP: 0, KR: 0, ...W1919_X };
+const W2020 = { GB: 10, US: 11, FR: 7, IT: 8, DE: 8, ES: 6, NL: 4, BE: 3, CH: 2, SE: 3, AT: 2, AR: 5, AU: 6, BR: 8, CA: 5, JP: 6, KR: 3, ...W2020_X };
 
-export function nationalityWeights(year) {
+// base = true: only the original 17 nationalities (the fixed legend roster)
+export function nationalityWeights(year, base = false) {
   const t = Math.max(0, Math.min(1, (year - 1919) / 101));
   const out = [];
-  for (const n of NATIONALITIES) out.push({ n, w: W1919[n] * (1 - t) + W2020[n] * t });
+  for (const n of (base ? BASE_NATIONALITIES : NATIONALITIES)) out.push({ n, w: W1919[n] * (1 - t) + W2020[n] * t });
   return out;
 }
 
@@ -100,11 +106,25 @@ function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 
 function lastVowelish(c) { return 'aeiouyáéíóúäöüèêàâ'.indexOf(c) >= 0; }
 
-export function makeSurname(rng, nat) {
-  const fam = FAMILY[nat] || FAMILY.GB;
-  const stem = rng.pick(fam.stems);
+const FAM_CACHE = new Map();
+function familyFor(nat, wide) {
+  const key = nat + (wide ? '+' : '');
+  if (FAM_CACHE.has(key)) return FAM_CACHE.get(key);
+  const base = FAMILY[nat] || NEW_FAMILY[nat] || FAMILY.GB;
+  const x = wide ? FAMILY_EXTRA[nat] : null;
+  const fam = x ? { ...base, stems: base.stems.concat(x.stems), ends: base.ends.concat(x.ends) } : base;
+  FAM_CACHE.set(key, fam);
+  return fam;
+}
+
+// wide = true uses the longer stem and ending lists (the fixed legend roster keeps the original ones).
+export function makeSurname(rng, nat, wide = false) {
+  const fam = familyFor(nat, wide);
+  let stem = rng.pick(fam.stems);
   let end = rng.pick(fam.ends);
   let joiner = '';
+  // two vowels meeting (Nune + eiro) lose the first, in the wide lists only
+  if (wide && end.length && lastVowelish(stem[stem.length - 1].toLowerCase()) && lastVowelish(end[0].toLowerCase())) stem = stem.slice(0, -1);
   if (fam.double) {
     const last = stem[stem.length - 1].toLowerCase();
     if (!lastVowelish(last) && end.length > 0 && 'aeiou'.indexOf(end[0]) >= 0 && rng.chance(0.55)) joiner = last;
@@ -112,20 +132,44 @@ export function makeSurname(rng, nat) {
   // avoid awkward doubled letters and over-long words
   let name = cap(stem) + joiner + end;
   name = name.replace(/([a-zäöüéèêàâ])\1\1+/gi, '$1$1');
-  if (fam.particle && rng.chance(0.28)) name = rng.pick(fam.particle) + name;
+  if (fam.prefix && rng.chance(0.7)) name = rng.pick(fam.prefix) + name;
+  else if (fam.particle && rng.chance(0.28)) name = rng.pick(fam.particle) + name;
   return name;
 }
 
-export function makeFirstName(rng, nat, gender = 'M') {
-  const table = gender === 'F' ? FIRST_F : FIRST;
-  return rng.pick(table[nat] || table.GB);
+// first names follow the generation: old-fashioned for the early births, then the names of each later age
+function eraMix(by) {
+  if (by <= 1935) return [1, 0, 0];
+  if (by < 1960) { const t = (by - 1935) / 25; return [1 - t, t, 0]; }
+  if (by < 1980) return [0, 1, 0];
+  if (by < 2000) { const t = (by - 1980) / 20; return [0, 1 - t, t]; }
+  return [0, 0.15, 0.85];
+}
+export function makeFirstName(rng, nat, gender = 'M', by) {
+  const F = gender === 'F';
+  if (NEW_FIRST[nat]) return rng.pick(NEW_FIRST[nat][F ? 'f' : 'm']);
+  const old = (F ? FIRST_F : FIRST)[nat] || (F ? FIRST_F : FIRST).GB;
+  if (typeof by !== 'number') return rng.pick(old);
+  const mid = (F ? FIRST_F_MID : FIRST_MID)[nat] || old;
+  const modern = (F ? FIRST_F_MODERN : FIRST_MODERN)[nat] || mid;
+  const mix = eraMix(by);
+  const pools = [old, mid, modern];
+  let pool = pools[0];
+  if (mix[0] < 1) {
+    const x = rng.next();
+    pool = x < mix[0] ? pools[0] : x < mix[0] + mix[1] ? pools[1] : pools[2];
+  }
+  return rng.pick(pool);
 }
 
 // used: Set of full names already taken in this world (mutated).
-export function makePersonName(rng, nat, used, gender = 'M') {
+// by: the person's birth year. Give it and the names suit the generation and use the wide surname lists;
+// leave it out and the original narrow tables are used (the fixed legend roster).
+export function makePersonName(rng, nat, used, gender = 'M', by) {
+  const wide = typeof by === 'number';
   for (let tries = 0; tries < 60; tries++) {
-    const first = makeFirstName(rng, nat, gender);
-    const last = makeSurname(rng, nat);
+    const first = makeFirstName(rng, nat, gender, by);
+    const last = makeSurname(rng, nat, wide);
     const full = first + ' ' + last;
     if (isRealDriverName(full)) continue;
     if (used && used.has(full)) continue;
@@ -133,8 +177,8 @@ export function makePersonName(rng, nat, used, gender = 'M') {
     return { first, last, full };
   }
   // vanishingly rare: add a middle initial
-  const first = makeFirstName(rng, nat, gender);
-  const last = makeSurname(rng, nat);
+  const first = makeFirstName(rng, nat, gender, by);
+  const last = makeSurname(rng, nat, wide);
   const full = first + ' ' + rng.pick('ABCDEFGHJKLMNPRSTW'.split('')) + '. ' + last;
   if (used) used.add(full);
   return { first, last, full };
@@ -158,16 +202,55 @@ const TEAM_SUFFIX = {
   CA: ['Racing', 'Motors', 'Speed Co.'],
   JP: ['Racing', 'Motors', 'Works'],
   KR: ['Racing', 'Motors', 'Works'],
+  IE: ['Racing', 'Motors', 'Special'],
+  PT: ['Equipa', 'Racing', 'Automóveis'],
+  FI: ['Racing', 'Motors', 'Tekniikka'],
+  DK: ['Racing', 'Motors', 'Motorsport'],
+  NO: ['Racing', 'Motors', 'Verksted'],
+  PL: ['Racing', 'Motors', 'Team'],
+  MX: ['Escudería', 'Racing', 'Talleres'],
+  CO: ['Escudería', 'Racing', 'Talleres'],
+  ZA: ['Racing', 'Motors', 'Engineering'],
+  NZ: ['Racing', 'Motors', 'Special'],
+  IN: ['Racing', 'Motors', 'Motorsport'],
+  CN: ['Racing', 'Motors', 'Motorsport'],
 };
 
-export function makeTeamName(rng, nat, used) {
-  const fam = FAMILY[nat] || FAMILY.GB;
+const PREFIX_STYLE = ['Écurie', 'Squadra', 'Escudería', 'Rennstall', 'Équipe', 'Equipe', 'Equipa', 'Scuderia'];
+// words that follow a name in each age of the sport
+function eraSuffixes(year) {
+  if (year < 1950) return ['Racing', 'Motors', 'Special', 'Engineering', 'Racing Syndicate'];
+  if (year < 1980) return ['Racing', 'Racing Team', 'Racing Developments', 'Engineering', 'Grand Prix', 'Automobiles', 'Racing Organisation', 'Team'];
+  if (year < 2010) return ['Racing', 'Motorsport', 'Grand Prix', 'International', 'Racing Team', 'Autosport', 'Competition', 'Engineering', 'Racing Developments'];
+  if (year < 2040) return ['Racing', 'Motorsport', 'Autosport', 'Competition', 'Performance', 'Grand Prix', 'Racing Team', 'Racing Group', 'Racing Technologies', 'Dynamics'];
+  return ['Racing', 'Motorsport', 'Dynamics', 'Systems', 'Labs', 'Collective', 'Racing Group', 'Autonomics', 'Performance', 'Mobility'];
+}
+// A new independent team's name. Without a year the original narrow patterns are used.
+export function makeTeamName(rng, nat, used, year) {
   const suffixes = TEAM_SUFFIX[nat] || TEAM_SUFFIX.GB;
+  const wide = typeof year === 'number';
   for (let tries = 0; tries < 40; tries++) {
-    const sur = makeSurname(rng, nat).replace(/^(von |van der |van den |van |de )/, '');
-    const suf = rng.pick(suffixes);
-    const prefixStyle = ['Écurie', 'Squadra', 'Escudería', 'Rennstall', 'Équipe', 'Equipe'].indexOf(suf) >= 0;
-    const name = prefixStyle ? suf + ' ' + sur : sur + ' ' + suf;
+    let name;
+    const roll = wide ? rng.next() : 1;
+    if (roll < 0.12) {
+      // named for a place
+      const places = (TEAM_PLACES[nat] || []).concat(TEAM_PLACES._);
+      name = rng.pick(places) + ' ' + rng.pick(eraSuffixes(year));
+    } else if (roll < 0.22 && year >= 1960) {
+      // named for an idea
+      const words = year >= 1990 ? TEAM_WORDS.late : TEAM_WORDS.early;
+      name = rng.pick(words) + ' ' + rng.pick(eraSuffixes(year));
+    } else if (roll < 0.32 && year >= 1950) {
+      // a partnership
+      const a = makeSurname(rng, nat, true).replace(/^(von |van der |van den |van |de |du )/, '');
+      const b = makeSurname(rng, nat, true).replace(/^(von |van der |van den |van |de |du )/, '');
+      name = a + (rng.chance(0.5) ? ' & ' : '-') + b + (year >= 1980 && rng.chance(0.5) ? ' ' + rng.pick(eraSuffixes(year)) : '');
+    } else {
+      const sur = makeSurname(rng, nat, wide).replace(/^(von |van der |van den |van |de |du )/, '');
+      const national = !wide || rng.chance(0.4);
+      const suf = national ? rng.pick(suffixes) : rng.pick(eraSuffixes(year));
+      name = PREFIX_STYLE.indexOf(suf) >= 0 ? suf + ' ' + sur : sur + ' ' + suf;
+    }
     if (used && used.has(name)) continue;
     if (used) used.add(name);
     return name;

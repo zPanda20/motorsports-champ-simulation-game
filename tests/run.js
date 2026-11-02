@@ -13,15 +13,16 @@ import { describeCar } from '../public/engine/car.js';
 import { beginSeason } from '../public/engine/season.js';
 import { pendingItems, resolveItem, settleAll, setRegulation } from '../public/engine/governor.js';
 import { activeSeries, seriesTier } from '../public/engine/tiers.js';
-import { titleTables, pointsToWin } from '../public/engine/records.js';
-import { BRAND_DEF, engineOnlyAt } from '../public/engine/data/brands.js';
+import { titleTables, pointsToWin, rivalries, seasonFight, rivalryGrade } from '../public/engine/records.js';
+import { retireIdentity, allIdentities, rebuildIdentities, identityTitles } from '../public/engine/identity.js';
+import { BRAND_DEF, engineOnlyAt, isSmallBuilder } from '../public/engine/data/brands.js';
 import { OILS, OIL_FROM, SUPPLIER_SPONSOR_IDS } from '../public/engine/data/oils.js';
 import { worksTargetFor } from '../public/engine/data/curve.js';
 import { GROUPS, groupName, groupOfBrand, MERGERS } from '../public/engine/data/corp.js';
-import { activeProgrammes } from '../public/engine/corp.js';
+import { activeProgrammes, effectiveBrand, programmeOf } from '../public/engine/corp.js';
 import { brandPalette, teamPalette, inkOn, contrast, brandMark as colorsBrandMark } from '../public/ui/colors.js';
 import { logoFile, logoFor, LOGO_BRANDS, LOGO_FILES } from '../public/ui/assets.js';
-import { readdirSync, existsSync } from 'node:fs';
+import { readdirSync, existsSync, readFileSync } from 'node:fs';
 import * as pages from '../public/ui/pages.js';
 
 let passed = 0, failed = 0;
@@ -76,7 +77,7 @@ test('names: generator never returns empty or odd names', () => {
   const r = makeRng('odd');
   for (let i = 0; i < 800; i++) {
     const n = makePersonName(r, r.pick(NATIONALITIES), null);
-    assert(/^[^\s]+ .{3,}$/.test(n.full), n.full);
+    assert(/^[^\s]+ .{2,}$/.test(n.full), n.full);
     assert(!/(.)\1\1/.test(n.full), 'triple letter in ' + n.full);
   }
 });
@@ -247,9 +248,9 @@ test('season: several years roll over cleanly and stay deterministic', () => {
 // ---- golden results: the same on every machine and browser ----
 test('golden: world and season results match the pinned values', () => {
   const w = createWorld({ seed: 'golden' });
-  eq(hashString(JSON.stringify(w)), '7037dded', 'world creation changed (update pin only if intended)');
+  eq(hashString(JSON.stringify(w)), '4383f34f', 'world creation changed (update pin only if intended)');
   runSeason(w);
-  eq(hashString(JSON.stringify(w.season)), 'c582d484', 'race simulation changed (update pin only if intended)');
+  eq(hashString(JSON.stringify(w.season)), 'aceeaddd', 'race simulation changed (update pin only if intended)');
 });
 
 // ---- saves ----
@@ -300,13 +301,20 @@ function auditYear(w, a) {
     }
     for (const d of t.sponsors || []) if (SUPPLIER_SPONSOR_IDS.has(d.id) && !d.supplier) a.conflict.push(`${y} ${t.name}: ${d.id}`);
   }
+  // a small engine builder never has the best engine of the year unless a big maker is partnered with it
+  const bigBest = Math.max(...w.brands.filter((b) => b.status === 'racing' && !isSmallBuilder(b.id)).map((b) => b.engineStrength));
+  for (const b of w.brands.filter((x) => x.status === 'racing' && isSmallBuilder(x.id))) {
+    const p = programmeOf(w, b.id);
+    if (!(p && p.kind === 'deal') && effectiveBrand(w, b).engineStrength >= bigBest) a.smallBest.push(`${y} ${b.id}`);
+    if (p && p.kind === 'deal') a.dealYears++;
+  }
 }
 
 function century(seed, years) {
   const w = createWorld({ seed });
   const seen = {
     titleBrands: new Set(), empty: 0, starts: 0, women: 0, racing: new Set(),
-    audit: { worksByYear: {}, deadBrand: [], engineOnlyWorks: [], engineOnlySupplied: new Set(), early: [], oilMissing: [], oilStale: [], conflict: [] },
+    audit: { worksByYear: {}, deadBrand: [], engineOnlyWorks: [], engineOnlySupplied: new Set(), early: [], oilMissing: [], oilStale: [], conflict: [], smallBest: [], dealYears: 0 },
   };
   for (let i = 0; i < years; i++) {
     const rounds = runSeason(w);
@@ -587,7 +595,7 @@ test('slice 4: sister makers pool programmes and some of them end', () => {
   const all = LONG.w.programmes || [];
   assert(all.length >= 1, 'no programme in a century');
   for (const p of all) {
-    assert(['engine', 'chassis', 'full', 'pool'].indexOf(p.kind) >= 0, 'kind ' + p.kind);
+    assert(['engine', 'chassis', 'full', 'pool', 'deal'].indexOf(p.kind) >= 0, 'kind ' + p.kind);
     assert(p.quality >= -0.1 && p.quality <= 0.12, 'quality ' + p.quality);
     assert(p.leadId !== p.partnerId);
   }
@@ -637,7 +645,7 @@ test('slice 4: save: a version 3 save gains oil, groups and origins and plays on
   assert(pages.pageTeam(loaded, loaded.teams.find((t) => t.active).id).length > 500);
 });
 test('slice 4: save: the current version round-trips the new fields', () => {
-  eq(SAVE_VERSION, 4);
+  eq(SAVE_VERSION, 5);
   const w = LONG.w;
   const again = deserialize(serialize(w), 'Y');
   eq(JSON.stringify(again.programmes), JSON.stringify(w.programmes));
@@ -713,6 +721,149 @@ test('logos: the badge shows beside a maker and on a works team, in any year', (
   }
   assert(w.brands.some((b) => b.id === 'pontiac'), 'Pontiac should be a maker (it has a badge)');
   assert(!/mono/.test(colorsBrandMark(w, 'chevrolet', 1911)), 'Chevrolet before its first badge year still shows a badge');
+});
+
+// ================================================================ slice 5
+const OLD_GB_FIRST = ['Arthur', 'Harold', 'Reginald', 'Clifford', 'Percy', 'Leslie', 'Cecil', 'Ernest', 'Walter', 'Douglas', 'Gilbert', 'Norman', 'Alfred', 'Basil', 'Victor', 'Roland'];
+test('slice 5: names: first names follow the generation, and the new nationalities give proper names', () => {
+  const r = makeRng('s5-names');
+  for (let i = 0; i < 200; i++) assert(OLD_GB_FIRST.indexOf(makePersonName(r, 'GB', null, 'M', 1900).first) >= 0, 'a 1900 birth has a period name');
+  let old = 0;
+  for (let i = 0; i < 300; i++) if (OLD_GB_FIRST.indexOf(makePersonName(r, 'GB', null, 'M', 2010).first) >= 0) old++;
+  eq(old, 0, 'a 2010 birth with a 1900 name');
+  const wide = new Set();
+  for (let i = 0; i < 400; i++) wide.add(makePersonName(r, 'GB', null, 'M', 1975).last);
+  assert(wide.size > 150, 'surnames should not repeat so much: ' + wide.size);
+  const NEW = NATIONALITIES.filter((n) => ['IE', 'PT', 'FI', 'DK', 'NO', 'PL', 'MX', 'CO', 'ZA', 'NZ', 'IN', 'CN'].indexOf(n) >= 0);
+  eq(NEW.length, 12);
+  for (const n of NEW) for (const by of [1930, 1990, 2030]) for (let i = 0; i < 40; i++) {
+    const p = makePersonName(r, n, null, i % 2 ? 'F' : 'M', by);
+    assert(/^\S+ .{2,}$/.test(p.full) && !/(.)\1\1/.test(p.full) && !/undefined|NaN/.test(p.full), n + ': ' + p.full);
+  }
+});
+test('slice 5: names: independent teams get names of the era, from places, ideas and partnerships as well as people', () => {
+  const r = makeRng('s5-teams'); const used = new Set();
+  const names = [];
+  for (let i = 0; i < 300; i++) names.push(makeTeamName(r, NATIONALITIES[i % NATIONALITIES.length], used, 1960 + (i % 80)));
+  eq(used.size, 300);
+  assert(names.some((n) => / & |-/.test(n)), 'no partnership names');
+  const last = new Set(names.map((n) => n.split(' ').slice(-1)[0]));
+  assert(last.size >= 12, 'few endings: ' + last.size);
+  assert(!names.some((n) => /undefined|NaN/.test(n)));
+});
+test('slice 5: Tesla and Brabham are gone from new worlds, and the other small builders only lead with a partner', () => {
+  const w = createWorld({ seed: 's5-cut' });
+  assert(!w.brands.some((b) => b.id === 'tesla' || b.id === 'brabham') && !BRAND_DEF.tesla && !BRAND_DEF.brabham, 'Tesla or Brabham still defined');
+  assert(!LONG.w.teams.some((t) => /tesla|brabham/i.test(t.name)), 'a Tesla or Brabham team in a new world');
+  eq(LONG.seen.audit.smallBest.length, 0, 'small engine builders with the best engine: ' + LONG.seen.audit.smallBest.slice(0, 5).join(', '));
+  assert(LONG.seen.audit.dealYears > 0, 'no engine partnership ever formed in a century');
+});
+
+test('slice 5: identities: a sale and rebrand starts the legacy again and the old identity stays in the books', () => {
+  const w = createWorld({ seed: 's5-ident' });
+  const t = w.teams.find((x) => x.kind === 'privateer');
+  t.titles = 7; t.wins = 60; t.legacy.score = 220; t.legacy.legendary = true; t.prestige = 70;
+  const oldName = t.name;
+  retireIdentity(w, t, 1952, 'sold', 'Brand New Racing');
+  t.name = 'Brand New Racing';
+  eq(t.eras.length, 1); eq(t.eras[0].name, oldName); eq(t.eras[0].titles, 7); eq(t.eras[0].to, 1951); assert(t.eras[0].legendary);
+  eq(t.legacy.score, 0); assert(!t.legacy.legendary); eq(identityTitles(t), 0); eq(t.idFrom, 1952);
+  eq(t.titles, 7, 'lifetime totals are kept');
+  const ids = allIdentities(w).filter((e) => e.teamId === t.id);
+  assert(ids.some((e) => !e.current && e.name === oldName && e.legendary), 'the old identity is listed as the legend it was');
+  assert(ids.some((e) => e.current && e.name === 'Brand New Racing' && !e.legendary));
+  const html = pages.pageLegacies(w);
+  assert(html.indexOf(oldName) >= 0 && !badHtml(html), 'the legendary teams page forgets the old name');
+  assert(/Past identities/.test(pages.pageTeam(w, t.id)));
+});
+test('slice 5: identities: in a century each team\'s identities join up with no gaps and no negative counts', () => {
+  const w = LONG.w; let eras = 0;
+  for (const t of w.teams) {
+    const list = t.eras || [];
+    for (let i = 0; i < list.length; i++) {
+      eras++;
+      const next = i + 1 < list.length ? list[i + 1].from : t.idFrom;
+      eq(list[i].to + 1, next, `${t.name}: ${list[i].name} ends ${list[i].to}, next begins ${next}`);
+      assert(list[i].titles >= 0 && list[i].wins >= 0);
+    }
+    assert(identityTitles(t) >= 0 && t.legacy.score >= 0, t.name);
+  }
+  assert(eras > 0, 'no team was ever sold, bought or rebranded in a century');
+  assert(allIdentities(w).some((e) => !e.current && e.legendary) || eras > 5, 'a legendary identity should survive its sale');
+  for (const t of w.teams) for (const h of (t.history || []).slice(-3)) assert(h.name && h.kind, 'season rows carry the identity of the season');
+});
+test('slice 5: identities: a version 4 save is given identities from the chronicle', () => {
+  const w = deepClone(LONG.w);
+  const t = w.teams.find((x) => x.active && x.kind === 'privateer');
+  t.names = ['Old Name Racing', t.name]; t.foundedYear = 1950; t.titles = 3; t.wins = 20;
+  w.chronicle.push({ year: 1971, kind: 'team', text: `Old Name Racing is sold to Z and rebranded as ${t.name}.` });
+  const o = JSON.parse(serialize(w)); o.version = 4; o.world.version = 4;
+  for (const x of o.world.teams) { delete x.eras; delete x.idFrom; delete x.idTitles0; delete x.idWins0; }
+  const back = deserialize(JSON.stringify(o), 'Z');
+  eq(back.version, SAVE_VERSION);
+  const bt = back.teams.find((x) => x.id === t.id);
+  eq(bt.eras.length, 1); eq(bt.eras[0].name, 'Old Name Racing'); eq(bt.eras[0].from, 1950); eq(bt.eras[0].to, 1970); eq(bt.idFrom, 1971);
+  for (const x of back.teams) assert(x.idFrom !== undefined && Array.isArray(x.eras), x.name);
+  assert(!badHtml(pages.pageLegacies(back)));
+  runSeason(back); // and it plays on
+});
+
+test('slice 5: rivalries: both must be real contenders, closeness counts, and the grade follows the seasons', () => {
+  eq(seasonFight(100, 100, 100, true, false), 1);
+  eq(seasonFight(100, 70, 100, true, false), 0, 'a driver 30% back is not a contender');
+  eq(seasonFight(80, 76, 100, false, false) > 0.25, true);
+  assert(seasonFight(95, 94, 100, true, false) > seasonFight(95, 80, 100, true, false), 'closer is more intense');
+  assert(seasonFight(95, 94, 100, false, false) > seasonFight(80, 79, 100, false, false), 'a fight at the front beats one just inside the range');
+  eq(rivalryGrade(0.5), 'Simmering'); eq(rivalryGrade(1.2), 'Heated'); eq(rivalryGrade(2.5), 'Fierce'); eq(rivalryGrade(4), 'Legendary');
+  const rv = rivalries(LONG.w, 50);
+  assert(rv.length > 0, 'a century with no rivalry');
+  for (let i = 0; i < rv.length; i++) {
+    assert(rv[i].seasons.length >= 2, 'a rivalry needs more than one season');
+    eq(Math.round(rv[i].seasons.reduce((a, s) => a + s.heat, 0) * 100) / 100, rv[i].score);
+    if (i) assert(rv[i - 1].score >= rv[i].score, 'sorted by intensity');
+  }
+  assert(!badHtml(pages.pageRecords(LONG.w)) && /Rivalries/.test(pages.pageRecords(LONG.w)));
+});
+
+test('slice 5: qualifying and pre-qualifying can be watched: everyone who ran is named, times are in order', () => {
+  const w = createWorld({ seed: 's5-quali' });
+  const prep = prepareRound(w);
+  assert(prep.prequal.tried.length >= prep.qualifying.length, 'pre-qualifying covers at least the cars that qualified');
+  for (const r of prep.prequal.tried) assert(prep.roster[r.entryId] && prep.roster[r.entryId].driverName, 'pre-qualifier without a name');
+  for (const r of prep.qualifying) assert(prep.roster[r.entryId] && prep.roster[r.entryId].number !== undefined, 'qualifier without a name');
+  for (let i = 1; i < prep.qualifying.length; i++) assert(prep.qualifying[i].time >= prep.qualifying[i - 1].time, 'qualifying out of order');
+  const before = JSON.stringify(w.season);
+  prepareRound(w);
+  eq(JSON.stringify(w.season), before, 'watching qualifying must not change the world');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  assert(/id="sessions"/.test(html), 'the session picker is missing');
+});
+
+test('slice 5: every interface theme has its styles, and the era map reaches the new ones', () => {
+  const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
+  const css = ['style.css', 'themes.css', 'themes2.css'].map((f) => readFileSync(new URL('../public/' + f, import.meta.url), 'utf8')).join('\n');
+  const block = app.slice(app.indexOf('const THEMES = ['), app.indexOf('function themeForYear'));
+  const ids = [...block.matchAll(/id: '([a-z0-9]+)'/g)].map((m) => m[1]);
+  for (const need of ['synthwave', 'holo', 'glass', 'dreamcore', 'parametric', 'brutal', 'neumorphic']) assert(ids.indexOf(need) >= 0, need + ' is not in the theme list');
+  for (const id of ids) assert(css.indexOf(`body[data-theme="${id}"]`) >= 0 || css.indexOf(`[data-theme="${id}"]`) >= 0, 'no styles for ' + id);
+  const fn = app.slice(app.indexOf('function themeForYear'), app.indexOf('const onMenu'));
+  for (const id of ['synthwave', 'holo', 'glass', 'dreamcore', 'parametric']) assert(fn.indexOf(`'${id}'`) >= 0, id + ' is never chosen by year');
+  assert(/y < 1988\) return 'pc98'/.test(fn) && /y < 1993\) return 'synthwave'/.test(fn), 'synthwave runs 1988-92 between PC-98 and vaporwave');
+  assert(/onMenu\(\) \? 'brutal'/.test(app), 'the main menu is Digital Brutalism');
+  assert(/themes2\.css/.test(readFileSync(new URL('../public/index.html', import.meta.url), 'utf8')));
+});
+
+test('slice 5: team pages link a founder to their career, and the career page draws', () => {
+  const w = LONG.w;
+  const eng = w.teams.find((t) => t.origin && t.origin.type === 'engineer-founder');
+  if (eng) {
+    assert(pages.pageTeam(w, eng.id).indexOf('href="#/person/') >= 0, 'the engineer founder is not a link');
+    const p = pages.pagePerson(w, eng.origin.by);
+    assert(/Career/.test(p) && !badHtml(p));
+  }
+  const drv = w.teams.find((t) => t.origin && t.origin.type === 'driver-founder' && driverById(w, t.origin.driverId));
+  if (drv) assert(pages.pageTeam(w, drv.id).indexOf(`href="#/driver/${drv.origin.driverId}"`) >= 0, 'the driver founder is not a link');
+  assert(eng || drv, 'no founded team in a century');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

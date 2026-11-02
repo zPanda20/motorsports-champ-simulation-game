@@ -97,15 +97,54 @@ export function teamDriverTenure(world, team) {
   return Object.values(m).sort((a, b) => b.seasons - a.seasons || a.first - b.first);
 }
 
-// rivalries: pairs of drivers who finished 1-2 in the championship more than once
-export function rivalries(world) {
+// Rivalries. A rivalry is two drivers who were both genuine title contenders in the same season, more than
+// once. Each season they share is graded on how close they finished and how serious both were (a fight for
+// third place does not count), and the rivalry is graded on all those seasons together: how intense each was
+// and how many different seasons it ran.
+const CONTENDER = 0.75;   // a contender is within a quarter of the leader's points
+const LIVE = 0.25;        // a season counts towards the rivalry from this intensity up
+export function seasonFight(a, b, leaderPts, aIsChamp, bIsChamp) {
+  if (!leaderPts || leaderPts <= 0) return 0;
+  const hi = Math.max(a, b), lo = Math.min(a, b);
+  if (lo / leaderPts < CONTENDER) return 0;
+  const gap = (hi - lo) / leaderPts;                                  // 0 = level on points
+  const close = Math.max(0, 1 - gap / 0.25);                          // 1 level ... 0 a quarter apart
+  const serious = Math.min(1, (lo / leaderPts - CONTENDER) / (1 - CONTENDER) * 1.5); // 0 just in range ... 1 at the front
+  const x = close * (0.5 + 0.5 * serious) + (aIsChamp || bIsChamp ? 0.1 : 0);
+  return Math.round(Math.min(1, x) * 100) / 100;
+}
+export const RIVALRY_GRADES = [[3.2, 'Legendary'], [2.0, 'Fierce'], [1.1, 'Heated'], [0, 'Simmering']];
+export function rivalryGrade(score) { for (const [min, name] of RIVALRY_GRADES) if (score >= min) return name; return 'Simmering'; }
+
+export function rivalries(world, limit = 12) {
   const m = {};
   for (const h of seasons(world)) {
     const d = h.final && h.final.drivers;
     if (!d || d.length < 2) continue;
-    const k = [d[0].id, d[1].id].sort((a, b) => a - b).join('-');
-    (m[k] = m[k] || []).push(h.year);
+    const lead = d[0].pts;
+    const champ = h.champion.id;
+    const field = d.filter((x) => lead > 0 && x.pts / lead >= CONTENDER).slice(0, 6);
+    for (let i = 0; i < field.length; i++) {
+      for (let j = i + 1; j < field.length; j++) {
+        const A = field[i], B = field[j];
+        const heat = seasonFight(A.pts, B.pts, lead, A.id === champ, B.id === champ);
+        if (heat < LIVE) continue;
+        const [x, y] = A.id < B.id ? [A, B] : [B, A];
+        const k = x.id + '-' + y.id;
+        (m[k] = m[k] || []).push({ year: h.year, aPts: x.pts, bPts: y.pts, gap: Math.abs(A.pts - B.pts), heat, champ: champ === x.id ? 'a' : champ === y.id ? 'b' : null,
+          teammates: !!(A.teamId && A.teamId === B.teamId), rankA: d.indexOf(x) + 1, rankB: d.indexOf(y) + 1 });
+      }
+    }
   }
-  return Object.entries(m).filter(([, y]) => y.length >= 2).map(([k, years]) => ({ a: +k.split('-')[0], b: +k.split('-')[1], years })).sort((x, y) => y.years.length - x.years.length).slice(0, 10);
+  return Object.entries(m).filter(([, ss]) => ss.length >= 2).map(([k, ss]) => {
+    const score = Math.round(ss.reduce((a, s) => a + s.heat, 0) * 100) / 100;
+    const years = ss.map((s) => s.year);
+    const closest = ss.slice().sort((p, q) => p.gap - q.gap || p.year - q.year)[0];
+    return {
+      a: +k.split('-')[0], b: +k.split('-')[1], seasons: ss, years, score, grade: rivalryGrade(score),
+      rating: Math.min(100, Math.round(score * 30)), titlesA: ss.filter((s) => s.champ === 'a').length, titlesB: ss.filter((s) => s.champ === 'b').length,
+      from: years[0], to: years[years.length - 1], closest, teammates: ss.filter((s) => s.teammates).length,
+    };
+  }).sort((p, q) => q.score - p.score || q.seasons.length - p.seasons.length || p.from - q.from).slice(0, limit);
 }
 export { driverById, teamById, brandById };

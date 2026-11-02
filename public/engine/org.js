@@ -10,6 +10,7 @@ import { OIL_FROM, OIL_BY_ID, oilNameAt } from './data/oils.js';
 import { programmeOf } from './corp.js';
 import { stability, eraFor } from './data/eras.js';
 import { overallAt } from './drivers.js';
+import { initIdentity, identityTitles, identityWins, retireIdentity } from './identity.js';
 import { usedNames, logEvent, brandById, teamById, driverById, activeEntries } from './world.js';
 
 const r2 = (x) => Math.round(x * 100) / 100;
@@ -45,7 +46,7 @@ export function makeOwner(world, rng, team, year) {
   const nat = team.nat || 'GB';
   let type = team.kind === 'works' ? 'manufacturer executive' : rng.pick(OWNER_TYPES);
   const g = rng.chance(0.5) ? 'F' : 'M';
-  const nm = makePersonName(rng, nat, used, g);
+  const nm = makePersonName(rng, nat, used, g, year - 45);
   const goals = { glory: rng.float(0.1, 1), profit: rng.float(0.1, 1), brand: rng.float(0.1, 1), legacy: rng.float(0.1, 1) };
   const tot = goals.glory + goals.profit + goals.brand + goals.legacy;
   for (const k of Object.keys(goals)) goals[k] = r2(goals[k] / tot);
@@ -85,6 +86,7 @@ export function initTeamOrg(world, team, rng, year) {
   if (!team.cycle) team.cycle = rng.int(3, 6);
   if (team.groupId === undefined) team.groupId = null;
   if (!team.names) team.names = [team.name];
+  initIdentity(team);
   if (!team.contracts) team.contracts = {};
   return team;
 }
@@ -348,10 +350,12 @@ function res(rank) { return 1 - (rank === undefined ? 0.6 : rank); }
 function legacyUpdate(world, year, ts) {
   for (const t of world.teams) {
     const L = t.legacy;
-    const yrs = Math.max(0, (t.endedYear && !t.active ? t.endedYear : year) - t.foundedYear);
-    L.score = Math.round(t.titles * 12 + t.wins * 0.7 + yrs * 0.5 + L.peakPrestige * 0.2);
+    const yrs = Math.max(0, (t.endedYear && !t.active ? t.endedYear : year) - (t.idFrom === undefined ? t.foundedYear : t.idFrom));
+    // legacy belongs to the identity racing now: a sale and rebrand starts it again
+    const titles = identityTitles(t);
+    L.score = Math.round(titles * 12 + identityWins(t) * 0.7 + yrs * 0.5 + L.peakPrestige * 0.2);
     const was = L.legendary;
-    L.legendary = L.score >= 90 && t.titles >= 3;
+    L.legendary = L.score >= 90 && titles >= 3;
     if (L.legendary && !was) logEvent(world, year, 'team', `${t.name} is now regarded as a legendary team.`);
   }
   void ts;
@@ -389,7 +393,9 @@ function lifecycle(world, year, rng, ev, rank, deactivate) {
         const rename = !t.legacy.legendary && r.fork('rename').chance(0.55);
         if (rename) {
           const names = new Set(world.teams.map((x) => x.name));
-          t.name = makeTeamName(r.fork('name'), nat, names);
+          const fresh = makeTeamName(r.fork('name'), nat, names, year);
+          retireIdentity(world, t, year, 'sold', fresh);
+          t.name = fresh;
           t.names.push(t.name);
           logEvent(world, year, 'team', `${old} is sold to ${t.owner.name} and rebranded as ${t.name}.`);
         } else logEvent(world, year, 'team', `${old} is sold to ${t.owner.name}.`);
@@ -469,7 +475,7 @@ export function orgYear(world, year, rng, last, callbacks) {
     const s = ts[t.id] || { pts: 0, wins: 0, podiums: 0 };
     const ents = activeEntries(world).filter((e) => e.teamId === t.id);
     t.history.push({
-      year: finished, brandId: t.brandId, tyreId: t.tyreId, pts: s.pts, wins: s.wins, podiums: s.podiums,
+      year: finished, name: t.name, kind: t.kind, colors: t.colors ? t.colors.slice() : null, brandId: t.brandId, tyreId: t.tyreId, pts: s.pts, wins: s.wins, podiums: s.podiums,
       rank: rank[t.id] === undefined ? null : Math.round(rank[t.id] * 100) / 100,
       entries: ents.map((e) => ({ number: e.number, driverId: e.driverId, type: e.type })),
     });

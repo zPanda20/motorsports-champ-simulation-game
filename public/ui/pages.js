@@ -18,7 +18,8 @@ import { entryStandings, driverStandings, brandStandings } from '../engine/seaso
 import { titleTables, recordBook, trackHistory, driverSeasons, driverTeams, teamDriverTenure, rivalries } from '../engine/records.js';
 import { formatTime, raceRecap } from '../engine/recap.js';
 import { esc, link, table, bar, kv, panel, small, tag, pct, ordinal, band, subtabs } from './common.js';
-import { brandMark, teamBadge, teamPalette, brandPalette, lowTeamPalette, rowFor, branded, swatch } from './colors.js';
+import { brandMark, teamMark, teamBadge, teamPalette, brandPalette, lowTeamPalette, rowFor, branded, swatch, identityPalette, identityBadge } from './colors.js';
+import { allIdentities, identityAt, identityTitles, identityWins } from '../engine/identity.js';
 import { GROUPS, GROUP_BY_ID, groupName, groupOfBrand, membersAt } from '../engine/data/corp.js';
 import { OILS, OIL_BY_ID, oilNameAt, OIL_FROM } from '../engine/data/oils.js';
 import { engineOnlyAt, BRAND_DEF } from '../engine/data/brands.js';
@@ -177,16 +178,16 @@ export function pageTeam(w, id) {
 
   const pal = teamPalette(w, t.id);
   const oil = t.oilId && w.year >= OIL_FROM ? OIL_BY_ID[t.oilId] : null;
-  const head = `<div class="hero">${t.kind === 'works' ? brandMark(w, t.brandId, w.year, true) : ''}<h2>${esc(t.name)}</h2><div class="small">${esc(status)} · ${esc(t.nat)} · founded ${t.foundedYear} · ${t.kind === 'works' ? `works team of ${bn(w, t.brandId)}` : `privateer, ${bn(w, t.brandId)} customer`} · ${esc((REGION_BY_ID[t.region] || {}).name || t.region || '')}` +
+  const head = `<div class="hero">${t.kind === 'works' ? teamMark(w, t.id, true) : ''}<h2>${esc(t.name)}</h2><div class="small">${esc(status)} · ${esc(t.nat)} · founded ${t.foundedYear} · ${t.kind === 'works' ? `works team of ${bn(w, t.brandId)}` : `privateer, ${bn(w, t.brandId)} customer`} · ${esc((REGION_BY_ID[t.region] || {}).name || t.region || '')}` +
     (t.names && t.names.length > 1 ? ` · formerly ${esc(t.names.filter((n) => n !== t.name).join(', '))}` : '') + '</div>' +
-    `<div class="small">${esc(originText(w, t))}</div>` +
+    `<div class="small">${originText(w, t)}</div>` +
     ((t.legacy && t.legacy.legendary) ? tag('legendary team') : '') + (t.groupId ? tag('sister teams') : '') + '</div>';
 
   const summary = panel('At a glance', kv([
-    ['Championships', t.titles], ['Race wins', t.wins], ['Podiums (seasons on record)', podiums], ['Seasons on record', hist.length],
+    ['Championships', t.titles + ((t.eras || []).length ? ` (${identityTitles(t)} as ${esc(t.name)})` : '')], ['Race wins', t.wins], ['Podiums (seasons on record)', podiums], ['Seasons on record', hist.length],
     ['Best championship rank', best === null ? '' : best === 0 ? 'champions' : 'top ' + Math.max(1, Math.round(best * 100)) + '%'],
     ['Fans', t.fans + ' ' + bar(t.fans)], ['Prestige', t.prestige + ' ' + bar(t.prestige)], ['Facilities', avgFac(t) + ' ' + bar(avgFac(t))],
-    ['Legacy score', t.legacy ? t.legacy.score : ''], ['Appetite for risk', pct(t.risk)],
+    ['Legacy score', t.legacy ? t.legacy.score + ((t.eras || []).length ? ` (this identity, since ${t.idFrom})` : '') : ''], ['Appetite for risk', pct(t.risk)],
     ['Who decides', t.control === 'engineer' ? 'the engineers' : t.control === 'principal' ? 'the principal' : esc(t.control)],
   ]));
 
@@ -246,22 +247,37 @@ export function pageTeam(w, id) {
     return ten.length ? table(['Driver', { t: 'Seasons', num: 1 }, 'Years'], ten.map((x) => [dn(w, x.driverId), x.seasons, `${x.first}-${x.last}`])) : small('No history yet.');
   })());
 
-  const history = panel('Season by season', hist.length ? table(['Year', 'Car from', 'Drivers', { t: 'Pts', num: 1 }, { t: 'Wins', num: 1 }, { t: 'Podiums', num: 1 }], hist.slice().reverse().slice(0, 40).map((h) =>
-    [h.year, bn(w, h.brandId), (h.entries || []).map((e) => e.driverId != null ? dn(w, e.driverId) : '').join(', '), h.pts, h.wins, h.podiums])) : small('No seasons yet.'));
+  // each season is coloured and named for the identity the team had then
+  const seasonId = (h) => {
+    if (h.name) return { name: h.name, kind: h.kind, colors: h.colors, brandId: h.brandId };
+    const e = identityAt(t, h.year);
+    return e ? { name: e.name, kind: e.kind, colors: e.colors, brandId: h.brandId || e.brandId } : { name: t.name, kind: t.kind, colors: t.colors, brandId: h.brandId || t.brandId };
+  };
+  const champYears = new Set(w.history.seasons.filter((h) => h.championTeam && h.championTeam.id === t.id).map((h) => h.year));
+  const histRows = hist.slice().reverse().slice(0, 40).map((h) => {
+    const id = seasonId(h);
+    return rowFor([h.year, identityBadge(w, id, h.year) + esc(id.name) + (champYears.has(h.year) ? tag('champions', 'gold') : ''), bn(w, h.brandId), (h.entries || []).map((e) => e.driverId != null ? dn(w, e.driverId) : '').join(', '), h.pts, h.wins, h.podiums], identityPalette(id));
+  });
+  const history = panel('Season by season', hist.length ? small('Each season is shown in the colours and name the team had at the time.') + table(['Year', 'Team then', 'Car from', 'Drivers', { t: 'Pts', num: 1 }, { t: 'Wins', num: 1 }, { t: 'Podiums', num: 1 }], histRows) : small('No seasons yet.'));
 
-  return branded(pal, head + summary + '<div class="two">' + lineup + owners + '</div><div class="two">' + staff + fac + '</div>' + academyHtml + car + '<div class="two">' + money_ + spons + '</div>' + rel + history);
+  const pastIds = (t.eras || []).length ? panel('Past identities', small('When a team is sold and rebranded, or bought or sold by a maker, its legacy starts again. What it was before stays in the record books under its old name.') +
+    table(['Identity', 'Years', { t: 'Titles', num: 1 }, { t: 'Wins', num: 1 }, { t: 'Legacy', num: 1 }, 'How it ended'], t.eras.slice().reverse().map((e) =>
+      rowFor([identityBadge(w, e, e.to) + esc(e.name) + (e.legendary ? tag('legendary') : ''), `${e.from}-${e.to}`, e.titles, e.wins, e.score, esc(e.how || '') + (e.successor ? ' &rarr; ' + esc(e.successor) : '')], identityPalette(e))))) : '';
+
+  return branded(pal, head + summary + '<div class="two">' + lineup + owners + '</div><div class="two">' + staff + fac + '</div>' + academyHtml + car + '<div class="two">' + money_ + spons + '</div>' + rel + pastIds + history);
 }
 
-// where a team came from, in words
+// where a team came from, in words (HTML: the founder is a link to their career page)
 function originText(w, t) {
   const o = t.origin || {};
   const BY = { engineers: 'its own engineers', investors: 'a consortium of investors', sponsor: 'an energy and consumer brand', driver: 'a former driver' };
+  const who = (name, driverId) => (driverId !== undefined && driverById(w, driverId) ? dn(w, driverId) : name ? link('person', encodeURIComponent(name), name) : '');
   switch (o.type) {
-    case 'manufacturer': return `Created as the factory team of ${o.by || brandText(w, t.brandId)}.`;
-    case 'driver-founder': return `Founded in ${o.year} by former champion ${o.by}${o.titles ? ` (${o.titles} title${o.titles > 1 ? 's' : ''})` : ''}.` + (o.climbed ? ` It began in ${o.startedIn} in a lower series and climbed to the top flight.` : '');
-    case 'engineer-founder': return `Founded in ${o.year} by ${o.by}, formerly technical director of ${o.from}. It builds its own chassis.`;
-    case 'buyout': return `Sold by ${o.fromBrandId && brandById(w, o.fromBrandId) ? brandText(w, o.fromBrandId) : 'its maker'} in ${o.year} to ${BY[o.by] || 'new owners'}${o.buyer ? ' (' + o.buyer + ')' : ''}; it kept the cars and the staff.`;
-    case 'manufacturer-buyin': return `Bought in ${o.year} by ${o.by}${o.previous ? ' from ' + o.previous : ''} and run as a factory effort.`;
+    case 'manufacturer': return `Created as the factory team of ${esc(o.by || brandText(w, t.brandId))}.`;
+    case 'driver-founder': return `Founded in ${o.year} by former champion ${who(o.by, o.driverId)}${o.titles ? ` (${o.titles} title${o.titles > 1 ? 's' : ''})` : ''}.` + (o.climbed ? ` It began in ${o.startedIn} in a lower series and climbed to the top flight.` : '');
+    case 'engineer-founder': return `Founded in ${o.year} by ${who(o.by)}, formerly technical director of ${o.fromTeamId && teamById(w, o.fromTeamId) ? link('team', o.fromTeamId, o.from) : esc(o.from)}. It builds its own chassis.`;
+    case 'buyout': return `Sold by ${o.fromBrandId && brandById(w, o.fromBrandId) ? esc(brandText(w, o.fromBrandId)) : 'its maker'} in ${o.year} to ${esc(BY[o.by] || 'new owners')}${o.buyer ? ' (' + esc(o.buyer) + ')' : ''}; it kept the cars and the staff.`;
+    case 'manufacturer-buyin': return `Bought in ${o.year} by ${esc(o.by)}${o.previous ? ' from ' + esc(o.previous) : ''} and run as a factory effort.`;
     default: return `Founded in ${t.foundedYear || o.year}${o.type === 'investors' ? ' by investors' : ''}.`;
   }
 }
@@ -761,7 +777,11 @@ export function pageRecords(w) {
     '<div class="three">' + panel('Career wins', table(['Driver', { t: 'Wins', num: 1 }], rb.careerWins.map((x) => [dn(w, x.id), x.n]))) +
     panel('Career starts', table(['Driver', { t: 'Starts', num: 1 }], rb.careerStarts.map((x) => [dn(w, x.id), x.n]))) +
     panel('Team wins', table(['Team', { t: 'Wins', num: 1 }], rb.teamWins.map((x) => [tn(w, x.id), x.n]))) + '</div>' +
-    panel('Rivalries', rv.length ? table(['Pair', { t: 'Seasons 1-2', num: 1 }, 'Years'], rv.map((x) => [dn(w, x.a) + ' and ' + dn(w, x.b), x.years.length, x.years.join(', ')])) : small('Rivalries appear when two drivers finish first and second more than once.')) +
+    panel('Rivalries', small('Two drivers who were both real title contenders (within a quarter of the leader) in the same season, more than once. Each season is graded on how close they finished and how serious both were; the rivalry is graded on that and on how many seasons it ran.') +
+      (rv.length ? table(['Pair', 'Grade', { t: 'Intensity', num: 1 }, '', { t: 'Seasons', num: 1 }, 'Span', 'Titles between them', 'Closest fight'], rv.map((x) =>
+        [dn(w, x.a) + ' and ' + dn(w, x.b) + (x.teammates ? tag(x.teammates === x.seasons.length ? 'teammates' : 'sometimes teammates') : ''),
+          tag(x.grade, x.grade === 'Legendary' ? 'gold' : ''), x.rating, bar(x.rating), x.seasons.length, `${x.from}-${x.to}`,
+          `${driverText(w, x.a)} ${x.titlesA}, ${driverText(w, x.b)} ${x.titlesB}`, `${x.closest.year} (${x.closest.gap} pt${x.closest.gap === 1 ? '' : 's'} apart)`])) : small('No rivalries yet. They appear when two drivers fight for the title in more than one season.'))) +
     panel('Venues', table(['Venue', 'Country', 'Open'], TRACKS.filter((t) => w.year >= t.opens && (!t.closes || w.year <= t.closes)).map((t) => [trn(t.id), esc(t.country), t.opens + (t.closes ? '-' + t.closes : '')])));
 }
 
@@ -800,9 +820,32 @@ export function pageSponsor(w, id) {
 }
 
 export function pageLegacies(w) {
-  const teams = w.teams.filter((t) => t.legacy && t.legacy.legendary).sort((a, b) => b.legacy.score - a.legacy.score);
-  const near = w.teams.filter((t) => t.legacy && !t.legacy.legendary).sort((a, b) => b.legacy.score - a.legacy.score).slice(0, 8);
-  return panel('Legendary teams', small('A team becomes legendary through titles, wins and years in the sport, the way the great names of the sport did. A legend that closes is likelier to be revived.') +
-    (teams.length ? table(['Team', 'Status', { t: 'Titles', num: 1 }, { t: 'Wins', num: 1 }, { t: 'Years', num: 1 }, { t: 'Legacy', num: 1 }], teams.map((t) => [tn(w, t.id), t.active ? 'racing' : 'closed ' + (t.endedYear || ''), t.titles, t.wins, (t.endedYear && !t.active ? t.endedYear : w.year) - t.foundedYear, t.legacy.score])) : small('None yet.')) +
-    '<h4>Building a legacy</h4>' + table(['Team', { t: 'Titles', num: 1 }, { t: 'Wins', num: 1 }, { t: 'Legacy', num: 1 }], near.map((t) => [tn(w, t.id), t.titles, t.wins, t.legacy.score])));
+  const ids = allIdentities(w);
+  const cell = (e) => identityBadge(w, e, e.to || w.year) + link('team', e.teamId, e.name);
+  const span = (e) => `${e.from}-${e.to || (e.active ? 'now' : '?')}`;
+  const fate = (e) => {
+    if (e.current) return e.active ? 'racing' : 'closed ' + (e.to || '');
+    return esc(e.how || 'ended') + (e.successor ? ' &rarr; ' + esc(e.successor) : '');
+  };
+  const legends = ids.filter((e) => e.legendary).sort((a, b) => b.score - a.score);
+  const near = ids.filter((e) => e.current && e.active && !e.legendary).sort((a, b) => b.score - a.score).slice(0, 8);
+  return panel('Legendary teams', small('A team becomes legendary through titles, wins and years in the sport, the way the great names of the sport did. When a team is sold and rebranded its legacy starts again, and the old identity stays here as the legend it was. A legend that closes is likelier to be revived.') +
+    (legends.length ? table(['Team', 'Years', 'What became of it', { t: 'Titles', num: 1 }, { t: 'Wins', num: 1 }, { t: 'Legacy', num: 1 }], legends.map((e) => rowFor([cell(e), span(e), fate(e), e.titles, e.wins, e.score], identityPalette(e)))) : small('None yet.')) +
+    '<h4>Building a legacy</h4>' + table(['Team', 'Since', { t: 'Titles', num: 1 }, { t: 'Wins', num: 1 }, { t: 'Legacy', num: 1 }], near.map((e) => rowFor([cell(e), e.from, e.titles, e.wins, e.score], identityPalette(e)))));
+}
+
+// a person who is not a driver: team staff and the engineers who founded teams. Their career is the story the chronicle tells.
+export function pagePerson(w, name) {
+  const roles = [];
+  for (const t of w.teams) for (const k of Object.keys(ROLE_LABEL)) if (t.staff && t.staff[k] && t.staff[k].name === name) roles.push({ t, k, s: t.staff[k] });
+  const founded = w.teams.filter((t) => t.origin && t.origin.by === name && (t.origin.type === 'engineer-founder' || t.origin.type === 'driver-founder'));
+  const driver = w.drivers.find((d) => d.name === name);
+  const log = (w.chronicle || []).filter((c) => c.text.indexOf(name) >= 0).sort((a, b) => a.year - b.year);
+  if (!roles.length && !founded.length && !driver && !log.length) return panel('Person', 'No record of ' + esc(name) + '.');
+  const first = roles[0] ? roles[0].s : null;
+  return `<div class="hero"><h2>${esc(name)}</h2><div class="small">${first ? esc(first.nat) + ' · ' : ''}${roles.length ? 'now ' + roles.map((r) => `${ROLE_LABEL[r.k].toLowerCase()} of ${link('team', r.t.id, r.t.name)}`).join(', ') : 'no longer in a team role'}</div>` +
+    (driver ? `<div class="small">Also raced: ${dn(w, driver.id)}</div>` : '') + '</div>' +
+    (founded.length ? panel('Teams founded', table(['Team', 'Founded', { t: 'Titles', num: 1 }, { t: 'Wins', num: 1 }, 'Status'], founded.map((t) => [tn(w, t.id), t.foundedYear, t.titles, t.wins, t.active ? 'racing' : 'left the grid ' + (t.endedYear || '')]))) : '') +
+    (roles.length ? panel('Current role', table(['Team', 'Role', { t: 'Age', num: 1 }, { t: 'Rating', num: 1 }], roles.map((r) => [tn(w, r.t.id), ROLE_LABEL[r.k], r.s.age === undefined ? '' : r.s.age, w.year < 1950 ? band(r.s.rating) : r.s.rating]))) : '') +
+    panel('Career', log.length ? '<ul class="evlog">' + log.map((c) => `<li><b>${c.year}</b> ${esc(c.text)}</li>`).join('') + '</ul>' : small('Nothing notable on record.'));
 }

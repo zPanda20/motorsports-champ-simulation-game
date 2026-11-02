@@ -12,10 +12,10 @@ export const CONTINENTS = [
   { id: 'EUR', name: 'European' }, { id: 'AME', name: 'Americas' }, { id: 'APAC', name: 'Asia-Pacific' }, { id: 'MEA', name: 'Middle East and Africa' },
 ];
 const MAP = {
-  GB: 'WEU', FR: 'WEU', IT: 'WEU', ES: 'WEU', PT: 'WEU', MC: 'WEU', BE: 'WEU', NL: 'WEU',
-  DE: 'CEU', CH: 'CEU', AT: 'CEU', SE: 'CEU',
-  US: 'NAM', CA: 'NAM', MX: 'NAM', BR: 'SAM', AR: 'SAM',
-  JP: 'ASP', KR: 'ASP', AU: 'ASP', CN: 'ASP', MY: 'ASP',
+  GB: 'WEU', FR: 'WEU', IT: 'WEU', ES: 'WEU', PT: 'WEU', MC: 'WEU', BE: 'WEU', NL: 'WEU', IE: 'WEU',
+  DE: 'CEU', CH: 'CEU', AT: 'CEU', SE: 'CEU', FI: 'CEU', DK: 'CEU', NO: 'CEU', PL: 'CEU',
+  US: 'NAM', CA: 'NAM', MX: 'NAM', BR: 'SAM', AR: 'SAM', CO: 'SAM',
+  JP: 'ASP', KR: 'ASP', AU: 'ASP', CN: 'ASP', MY: 'ASP', NZ: 'ASP', IN: 'ASP',
   BH: 'MEA', AE: 'MEA', ZA: 'MEA',
 };
 export const regionOf = (country) => MAP[country] || 'WEU';

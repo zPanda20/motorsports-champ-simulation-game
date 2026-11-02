@@ -226,7 +226,7 @@ function staffYear(world, year, rng) {
       const fac = t.facilities ? (t.facilities.workshops - 50) / 100 : 0;
       m.rating = Math.round(clamp(m.rating + (m.age < 46 ? 0.8 : -0.8) + r.fork('d', k).gauss(0, 2) + fac, 18, 95));
       if (m.age >= 64 || (m.age >= 55 && r.fork('ret', k).chance(0.15))) {
-        const nm = makeStaff(r.fork('new', k), t.nat, used, t.wealth)[k];
+        const nm = makeStaff(r.fork('new', k), t.nat, used, t.wealth, year)[k];
         nm.age = r.fork('na', k).int(30, 45);
         logEvent(world, year, 'staff', `${m.name} retires as ${staffTitle(k)} of ${t.name}; ${nm.name} takes over.`);
         t.staff[k] = nm;

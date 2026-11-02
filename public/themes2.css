@@ -1,0 +1,304 @@
+/* Slice 5 themes: the main menu, the synthwave bridge between PC-98 and vaporwave, kinetic type for
+   constructivism, the neumorphic "no era styling" option, and the four later periods (2040s to 2070s).
+   Same rule as themes.css: decoration lives in margins, borders, headings and the page background,
+   never behind running text; tables and body copy stay on a flat, high-contrast surface. */
+
+/* ============================================================ MAIN MENU  Digital Brutalism */
+/* raw, oversized, unpolished on purpose: monospace, hard borders, flat hot colours, a visible grid */
+body[data-theme="brutal"] {
+  --bg: #e4e4de; --panel: #ffffff; --ink: #000000; --muted: #3a3a3a; --line: #000000; --hover: #fff200;
+  --a1: #ff1a1a; --a2: #fff200; --a3: #1414ff;
+  --rule: 4px; --rulec: #000000; --radius: 0px; --shadow: 9px 9px 0 #000000;
+  --font: "Courier New", Courier, monospace; --hfont: "Arial Black", Impact, Arial, sans-serif; --htr: uppercase; --hls: -.03em; --hweight: 900;
+  --btn-bg: #ffffff; --btn-fg: #000000; --btn-hover: #fff200; --prim-bg: #1414ff; --prim-fg: #ffffff;
+  --tab-on-bg: #000000; --tab-on-fg: #ffffff; --hdr-bg: #ffffff; --hdr-fg: #000000;
+  --b1: #ff1a1a; --b2: #fff200; --b3: #1414ff; --brad: 0px; --glow: none; --panel-blur: none;
+  --bg2: repeating-linear-gradient(0deg, rgba(0,0,0,.14) 0 1px, transparent 1px 32px), repeating-linear-gradient(90deg, rgba(0,0,0,.14) 0 1px, transparent 1px 32px);
+}
+body[data-theme="brutal"] header.top { border-bottom: 8px solid #000; }
+body[data-theme="brutal"] .brand h1 { font-size: 30px; background: #000; color: #fff; padding: 2px 10px; }
+body[data-theme="brutal"] .block { border-width: 4px; width: 22px; }
+body[data-theme="brutal"] .status { font-family: var(--font); border: 3px solid #000; padding: 4px 8px; background: #fff200; }
+body[data-theme="brutal"] .panel { border-width: 4px; border-radius: 0; }
+body[data-theme="brutal"] .panel::before { display: none; }
+body[data-theme="brutal"] h2 { font-size: 28px; border-bottom: 6px solid #000; padding-bottom: 4px; }
+body[data-theme="brutal"] button, body[data-theme="brutal"] select, body[data-theme="brutal"] input { border-width: 3px; border-radius: 0; font-family: var(--font); text-transform: uppercase; box-shadow: 4px 4px 0 #000; }
+body[data-theme="brutal"] button:active:not(:disabled) { box-shadow: none; transform: translate(4px, 4px); }
+body[data-theme="brutal"] input { text-transform: none; box-shadow: none; background: #fff; }
+body[data-theme="brutal"] a.lk { color: #1414ff; text-decoration: underline; text-decoration-thickness: 3px; text-decoration-color: #1414ff; }
+body[data-theme="brutal"] a.lk:hover { background: #fff200; color: #000; }
+body[data-theme="brutal"] th { background: #000; color: #fff; border-bottom: 0; }
+body[data-theme="brutal"] td { border: 1px solid #000; }
+body[data-theme="brutal"] .tabs { box-shadow: 6px 6px 0 #000; border-radius: 0; }
+body[data-theme="brutal"] .tag { border-radius: 0; border-width: 3px; background: #fff200; color: #000; }
+/* the menu itself: a poster of a form */
+body[data-theme="brutal"] #welcome { margin-top: 18px; padding: 22px 24px 26px; background: #ffffff; border: 6px solid #000; box-shadow: 14px 14px 0 #000; }
+body[data-theme="brutal"] #welcome h2 { font-size: clamp(40px, 9vw, 104px); line-height: .88; letter-spacing: -.045em; border: 0; padding: 0; margin: 0 0 14px; word-break: break-word; }
+body[data-theme="brutal"] #welcome h2::after { content: ""; display: block; height: 18px; margin-top: 10px; background: repeating-linear-gradient(90deg, #ff1a1a 0 36px, #000 36px 72px, #fff200 72px 108px, #1414ff 108px 144px); border: 3px solid #000; }
+body[data-theme="brutal"] #welcome p { font-size: 16px; max-width: 70ch; border-left: 10px solid #000; padding-left: 14px; }
+body[data-theme="brutal"] #welcome label { display: inline-flex; flex-direction: column; gap: 4px; font-weight: 700; text-transform: uppercase; font-size: 12px; letter-spacing: .08em; }
+body[data-theme="brutal"] #welcome .row { align-items: flex-end; gap: 14px; }
+body[data-theme="brutal"] #btn-start { font-size: 20px; padding: 12px 22px; background: #ff1a1a; color: #000; }
+body[data-theme="brutal"] #btn-start:hover:not(:disabled) { background: #000; color: #fff200; }
+body[data-theme="brutal"] footer { border-top: 6px solid #000; background: #fff; }
+
+/* ============================================================ 1988-92  Synthwave */
+/* PC-98 going to vaporwave: the pixel-navy screen warms to purple, a sun sets behind a perspective grid,
+   the chrome type arrives. data-phase a/b/c = 1988-89 / 1990 / 1991-92, each a step further from PC-98. */
+body[data-theme="synthwave"] {
+  --bg: #0a0626; --panel: #120a3a; --ink: #f1e9ff; --muted: #a99bdc; --line: #2c1d6e; --hover: #231660;
+  --a1: #ff3df0; --a2: #29e0ff; --a3: #ffb347;
+  --rule: 2px; --rulec: #ff3df0; --radius: 3px; --shadow: 4px 4px 0 #06031a, 0 0 18px rgba(255,61,240,.22);
+  --font: "MS Gothic", "Lucida Console", Verdana, monospace; --hfont: "Trebuchet MS", Verdana, sans-serif; --htr: uppercase; --hls: .14em; --hweight: 800;
+  --btn-bg: #0a0626; --btn-fg: #29e0ff; --btn-hover: #2c1d6e; --prim-bg: linear-gradient(90deg, #ff3df0, #ff8a3d); --prim-fg: #0a0626;
+  --tab-on-bg: linear-gradient(90deg, #ff3df0, #8f5bff); --tab-on-fg: #0a0626; --hdr-bg: linear-gradient(180deg, #06031a, #120a3a); --hdr-fg: #f1e9ff;
+  --b1: #ff3df0; --b2: #29e0ff; --b3: #ffb347; --brad: 0px; --glow: 0 0 8px rgba(255,61,240,.8);
+  --bg2:
+    radial-gradient(circle at 50% 108%, #ffe36b 0 7%, #ff8a3d 8% 13%, #ff3df0 14% 22%, transparent 23%) fixed,
+    linear-gradient(180deg, #0a0626 0%, #1a0b4d 62%, #3b0f66 100%) fixed;
+}
+body[data-theme="synthwave"][data-phase="a"] { --bg: #07071f; --panel: #0b0b2e; --line: #1d2358; --hover: #14185a; --rulec: #29e0ff; --a1: #29e0ff; --a2: #ff3df0; --hfont: "MS Gothic", "Lucida Console", monospace; --hls: .1em; --radius: 0px;
+  --bg2: radial-gradient(circle at 50% 108%, #ff3df0 0 6%, #8f5bff 7% 13%, transparent 14%) fixed, linear-gradient(180deg, #05051a, #0b0b2e 70%, #1a0b4d) fixed; }
+body[data-theme="synthwave"][data-phase="b"] { --bg: #120833; --panel: #190d48; --rulec: #ff3df0; }
+body[data-theme="synthwave"][data-phase="c"] { --bg: #2a0f66; --panel: #331478; --ink: #fff3ff; --muted: #d6c2ff; --line: #5a2fb0; --hover: #4a22a0; --rulec: #5be6ff; --a1: #ff4fb8; --a2: #5be6ff; --radius: 6px; --hls: .2em;
+  --hfont: "Times New Roman", Georgia, serif; --shadow: 5px 5px 0 #ff4fb8, 0 0 22px rgba(91,230,255,.25);
+  --bg2: radial-gradient(circle at 50% 108%, #fff3a0 0 7%, #ff9de2 8% 15%, #ff4fb8 16% 24%, transparent 25%) fixed, linear-gradient(180deg, #2a0f66 0%, #5a2fb0 55%, #b25be6 100%) fixed; }
+/* the grid under the horizon */
+body[data-theme="synthwave"]::after { content: ""; position: fixed; left: -20%; right: -20%; bottom: 0; height: 36vh; z-index: -1; pointer-events: none;
+  background: repeating-linear-gradient(90deg, rgba(255,61,240,.5) 0 2px, transparent 2px 70px), repeating-linear-gradient(0deg, rgba(41,224,255,.4) 0 2px, transparent 2px 38px);
+  transform: perspective(260px) rotateX(58deg); transform-origin: 50% 100%; -webkit-mask-image: linear-gradient(transparent, #000 70%); mask-image: linear-gradient(transparent, #000 70%); }
+body[data-theme="synthwave"] header.top { border-bottom: 2px solid #ff3df0; box-shadow: 0 2px 14px rgba(255,61,240,.5); }
+body[data-theme="synthwave"] .brand h1, body[data-theme="synthwave"] .hero h2 { background: linear-gradient(180deg, #ffffff 0 45%, #29e0ff 46% 55%, #ff3df0 56%); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; filter: drop-shadow(0 0 6px rgba(255,61,240,.7)); }
+body[data-theme="synthwave"] .panel { border-width: 2px; }
+body[data-theme="synthwave"] .panel::before { width: 46px; height: 8px; background: linear-gradient(90deg, #ff3df0, #29e0ff); border: 0; border-radius: 0; left: 10px; top: -5px; }
+body[data-theme="synthwave"] .panel h3 { color: #29e0ff; font-size: 14px; border-bottom: 1px solid #ff3df0; padding-bottom: 3px; }
+body[data-theme="synthwave"] th { color: #29e0ff; border-bottom: 2px solid #ff3df0; }
+body[data-theme="synthwave"] td { border-bottom: 1px solid #2c1d6e; }
+body[data-theme="synthwave"] button, body[data-theme="synthwave"] select { border-radius: 2px; box-shadow: inset -2px -2px 0 rgba(0,0,0,.45), inset 2px 2px 0 rgba(255,255,255,.18); }
+body[data-theme="synthwave"] .tag { color: #ffb347; border-color: #ffb347; }
+body[data-theme="synthwave"] .meter { background: #2c1d6e; }
+body[data-theme="synthwave"] .meter > span { background: linear-gradient(90deg, #29e0ff, #ff3df0); }
+body[data-theme="synthwave"] .branded .hero h2 { background: none; color: var(--ci); filter: none; -webkit-background-clip: border-box; }
+
+/* ============================================================ 1935-39  Constructivism: kinetic type */
+/* headings arrive letter by letter on a diagonal, then sit on the slab; hover throws the letters.
+   app.js wraps each word of a heading in .w and each letter in a span when this theme is on. */
+.kin .w { display: inline-block; white-space: nowrap; }
+.kin .w + .w { margin-left: .28em; }
+.kin .w > span { display: inline-block; }
+body[data-theme="constructivism"] .kin .w > span { animation: kin-in .85s cubic-bezier(.2,.9,.25,1) both; animation-delay: calc(var(--i) * 32ms); transform-origin: 0 100%; }
+body[data-theme="constructivism"] .kin:hover .w > span { animation: kin-throw .6s cubic-bezier(.3,1.6,.5,1) both; animation-delay: calc(var(--i) * 18ms); }
+@keyframes kin-in {
+  0% { opacity: 0; transform: translateX(-90px) skewX(-34deg) scale(1.9, .6); }
+  55% { opacity: 1; transform: translateX(10px) skewX(8deg) scale(1, 1.12); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes kin-throw {
+  0% { transform: none; } 35% { transform: translateY(-.28em) rotate(-7deg) scale(1.15); } 100% { transform: none; }
+}
+/* the red wedge in the header slides across once on load, the status line is pushed in on a slab */
+body[data-theme="constructivism"] header.top { background-size: 240% 100%; animation: kin-wedge 1.1s cubic-bezier(.2,.9,.25,1) both; }
+@keyframes kin-wedge { from { background-position: 100% 0; } to { background-position: 0 0; } }
+body[data-theme="constructivism"] .status { animation: kin-status .9s cubic-bezier(.2,.9,.25,1) .15s both; display: inline-block; transform-origin: 0 50%; }
+@keyframes kin-status { from { opacity: 0; transform: translateX(-60px) skewX(-24deg); } to { opacity: 1; transform: none; } }
+body[data-theme="constructivism"] .tabs a { transition: transform .18s; }
+body[data-theme="constructivism"] .tabs a:hover { transform: skewX(-8deg) scale(1.05); }
+body[data-theme="constructivism"] .tabs a.on { transform: skewX(-8deg); }
+@media (prefers-reduced-motion: reduce) {
+  body[data-theme="constructivism"] .kin .w > span, body[data-theme="constructivism"] header.top, body[data-theme="constructivism"] .status { animation: none; }
+  body[data-theme="constructivism"] .tabs a, body[data-theme="constructivism"] .tabs a.on { transform: none; }
+}
+
+/* ============================================================ "No era styling"  Neumorphism */
+/* soft plastic: one grey, light from the top left; panels rise from the page, inputs sink into it */
+body[data-theme="neumorphic"] {
+  --bg: #e3e8ef; --panel: #e3e8ef; --ink: #2b3144; --muted: #5d667d; --line: #cbd2de; --hover: #d9e0ea;
+  --a1: #5b6cf0; --a2: #f0a35b; --a3: #3aa6a0;
+  --rule: 0px; --rulec: transparent; --radius: 18px;
+  --shadow: 9px 9px 18px #b6bfcf, -9px -9px 18px #ffffff;
+  --font: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; --hfont: var(--font); --htr: none; --hls: 0; --hweight: 700;
+  --btn-bg: #e3e8ef; --btn-fg: #2b3144; --btn-hover: #dbe1ea; --prim-bg: #5b6cf0; --prim-fg: #ffffff;
+  --tab-on-bg: #5b6cf0; --tab-on-fg: #ffffff; --hdr-bg: #e3e8ef; --hdr-fg: #2b3144;
+  --b1: #5b6cf0; --b2: #f0a35b; --b3: #3aa6a0; --brad: 50%; --glow: none; --panel-blur: none; --bg2: none;
+}
+body[data-theme="neumorphic"] header.top { border-bottom: 0; box-shadow: 0 8px 16px -8px #b6bfcf; }
+body[data-theme="neumorphic"] .panel { border: 0; padding: 18px 20px; margin-bottom: 22px; }
+body[data-theme="neumorphic"] .panel::before { display: none; }
+body[data-theme="neumorphic"] .block { border: 0; border-radius: 10px; box-shadow: 3px 3px 6px #b6bfcf, -3px -3px 6px #ffffff; }
+body[data-theme="neumorphic"] button, body[data-theme="neumorphic"] select, body[data-theme="neumorphic"] a.btnlink { border: 0; border-radius: 14px; box-shadow: 5px 5px 10px #b6bfcf, -5px -5px 10px #ffffff; padding: 8px 16px; }
+body[data-theme="neumorphic"] button:hover:not(:disabled) { color: var(--ink); }
+body[data-theme="neumorphic"] button:active:not(:disabled) { box-shadow: inset 4px 4px 8px #b6bfcf, inset -4px -4px 8px #ffffff; }
+body[data-theme="neumorphic"] button.primary { box-shadow: 5px 5px 12px rgba(91,108,240,.45), -4px -4px 10px #ffffff; }
+body[data-theme="neumorphic"] button.primary:hover:not(:disabled) { background: #4757d6; color: #fff; }
+body[data-theme="neumorphic"] input { border: 0; border-radius: 12px; background: #e3e8ef; box-shadow: inset 4px 4px 8px #b6bfcf, inset -4px -4px 8px #ffffff; }
+body[data-theme="neumorphic"] .tabs { border: 0; border-radius: 18px; box-shadow: inset 5px 5px 10px #b6bfcf, inset -5px -5px 10px #ffffff; padding: 5px; gap: 4px; }
+body[data-theme="neumorphic"] .tabs a { border: 0; border-radius: 13px; padding: 7px 13px; }
+body[data-theme="neumorphic"] .tabs a.on { box-shadow: 4px 4px 9px rgba(91,108,240,.5), -3px -3px 8px #ffffff; }
+body[data-theme="neumorphic"] .subtabs a { border: 0; border-radius: 13px; box-shadow: 4px 4px 8px #b6bfcf, -4px -4px 8px #ffffff; background: var(--panel); }
+body[data-theme="neumorphic"] .subtabs a.on { box-shadow: inset 3px 3px 6px rgba(0,0,0,.25); }
+body[data-theme="neumorphic"] th { border-bottom: 2px solid var(--line); }
+body[data-theme="neumorphic"] .tag { border: 0; border-radius: 10px; box-shadow: inset 2px 2px 4px #b6bfcf, inset -2px -2px 4px #ffffff; }
+body[data-theme="neumorphic"] .tag.gold { background: #f6d27a; box-shadow: none; }
+body[data-theme="neumorphic"] .meter { height: 10px; border-radius: 6px; background: #e3e8ef; box-shadow: inset 2px 2px 4px #b6bfcf, inset -2px -2px 4px #ffffff; }
+body[data-theme="neumorphic"] .meter > span { border-radius: 6px; }
+body[data-theme="neumorphic"] .item { border: 0; border-radius: 14px; box-shadow: inset 3px 3px 7px #b6bfcf, inset -3px -3px 7px #ffffff; background: var(--bg); }
+body[data-theme="neumorphic"] .hero { border-bottom: 0; }
+body[data-theme="neumorphic"] .branded .hero { border-radius: 18px; box-shadow: 8px 8px 16px #b6bfcf, -8px -8px 16px #ffffff; }
+body[data-theme="neumorphic"] .scroll { border: 0; border-radius: 14px; box-shadow: inset 3px 3px 7px #b6bfcf, inset -3px -3px 7px #ffffff; }
+
+/* ============================================================ 2040s  Holographic / iridescent */
+/* pearl white and oil-slick edges: every border is a slow rainbow foil, the headings catch the light */
+body[data-theme="holo"] {
+  --bg: #f1effa; --panel: #fbfaff; --ink: #1c1930; --muted: #5b5878; --line: #ddd8f0; --hover: #ece8fb;
+  --a1: #c04bff; --a2: #3fd0ff; --a3: #34d9a5;
+  --rule: 2px; --rulec: #b9a8ff; --radius: 16px; --shadow: 0 10px 30px rgba(140,110,255,.18);
+  --font: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; --hfont: var(--font); --htr: none; --hls: .01em; --hweight: 800;
+  --btn-bg: #fbfaff; --btn-fg: #1c1930; --btn-hover: #ece8fb; --prim-bg: linear-gradient(110deg, #ff7ad9, #7ad8ff 40%, #8dffc2 70%, #c9a8ff); --prim-fg: #1c1930;
+  --tab-on-bg: linear-gradient(110deg, #ff7ad9, #7ad8ff 45%, #b8a0ff); --tab-on-fg: #1c1930; --hdr-bg: #fbfaff; --hdr-fg: #1c1930;
+  --b1: #ff7ad9; --b2: #7ad8ff; --b3: #8dffc2; --brad: 50%; --glow: none; --panel-blur: none;
+  --bg2:
+    radial-gradient(ellipse at 8% 0%, rgba(255,122,217,.28), transparent 45%) fixed,
+    radial-gradient(ellipse at 96% 12%, rgba(122,216,255,.30), transparent 42%) fixed,
+    radial-gradient(ellipse at 60% 100%, rgba(141,255,194,.26), transparent 48%) fixed;
+}
+body[data-theme="holo"] header.top { border-bottom: 3px solid transparent; border-image: linear-gradient(90deg, #ff7ad9, #7ad8ff, #8dffc2, #ffd27a, #c9a8ff, #ff7ad9) 1; }
+body[data-theme="holo"] .panel { border: 2px solid transparent;
+  background: linear-gradient(var(--panel), var(--panel)) padding-box, linear-gradient(120deg, #ff7ad9, #7ad8ff, #8dffc2, #ffd27a, #c9a8ff, #ff7ad9) border-box; background-size: auto, 300% 300%; animation: holo-slide 14s linear infinite; }
+body[data-theme="holo"] .panel::before { display: none; }
+@keyframes holo-slide { from { background-position: 0 0, 0% 50%; } to { background-position: 0 0, 300% 50%; } }
+body[data-theme="holo"] .brand h1, body[data-theme="holo"] .hero h2 { background: linear-gradient(100deg, #b535ff, #1da9e0 30%, #11b88a 55%, #e08a00 75%, #b535ff); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; animation: holo-text 9s linear infinite; }
+@keyframes holo-text { from { background-position: 0% 0; } to { background-position: 250% 0; } }
+body[data-theme="holo"] .panel h3 { font-size: 15px; }
+body[data-theme="holo"] th { border-bottom: 2px solid #c9a8ff; color: #4a3a8f; }
+body[data-theme="holo"] button, body[data-theme="holo"] select, body[data-theme="holo"] input { border: 2px solid #c9b8ff; border-radius: 12px; }
+body[data-theme="holo"] button.primary { border-color: transparent; }
+body[data-theme="holo"] .tabs { border-radius: 16px; border: 2px solid #c9b8ff; }
+body[data-theme="holo"] .tabs a { border-right-color: #ddd8f0; }
+body[data-theme="holo"] .tag { border-radius: 12px; border-color: #b9a8ff; }
+body[data-theme="holo"] .meter > span { background: linear-gradient(90deg, #ff7ad9, #7ad8ff, #8dffc2); }
+body[data-theme="holo"] .branded .hero h2 { background: none; color: var(--ci); animation: none; -webkit-background-clip: border-box; }
+body[data-theme="holo"] .branded .hero { border-radius: 16px; }
+@media (prefers-reduced-motion: reduce) { body[data-theme="holo"] .panel, body[data-theme="holo"] .brand h1, body[data-theme="holo"] .hero h2 { animation: none; } }
+
+/* ============================================================ 2050s  Glassmorphism */
+/* frosted panes floating over soft coloured light */
+body[data-theme="glass"] {
+  --bg: #141a3d; --panel: rgba(255,255,255,.13); --ink: #f6f8ff; --muted: #c0c9ee; --line: rgba(255,255,255,.22); --hover: rgba(255,255,255,.16);
+  --a1: #ff8fb8; --a2: #8fd9ff; --a3: #9bffd3;
+  --rule: 1px; --rulec: rgba(255,255,255,.38); --radius: 22px; --shadow: 0 12px 40px rgba(6,10,40,.45);
+  --font: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; --hfont: var(--font); --htr: none; --hls: .005em; --hweight: 650;
+  --btn-bg: rgba(255,255,255,.14); --btn-fg: #f6f8ff; --btn-hover: rgba(255,255,255,.30); --prim-bg: linear-gradient(120deg, #ff8fb8, #8fb4ff); --prim-fg: #0f1233;
+  --tab-on-bg: rgba(255,255,255,.88); --tab-on-fg: #141a3d; --hdr-bg: rgba(255,255,255,.08); --hdr-fg: #f6f8ff;
+  --b1: #ff8fb8; --b2: #8fd9ff; --b3: #9bffd3; --brad: 50%; --glow: none; --panel-blur: blur(22px) saturate(160%);
+  --bg2:
+    radial-gradient(circle at 12% 18%, rgba(255,120,190,.55), transparent 34%) fixed,
+    radial-gradient(circle at 86% 12%, rgba(90,190,255,.55), transparent 36%) fixed,
+    radial-gradient(circle at 72% 86%, rgba(120,255,200,.42), transparent 38%) fixed,
+    radial-gradient(circle at 20% 90%, rgba(150,120,255,.50), transparent 40%) fixed,
+    linear-gradient(160deg, #141a3d, #2a1f5c 55%, #1b3a5e) fixed;
+}
+body[data-theme="glass"] header.top { backdrop-filter: blur(18px) saturate(150%); border-bottom: 1px solid rgba(255,255,255,.3); }
+body[data-theme="glass"] .panel { border: 1px solid rgba(255,255,255,.38); box-shadow: var(--shadow), inset 0 1px 0 rgba(255,255,255,.45); -webkit-backdrop-filter: blur(22px) saturate(160%); }
+body[data-theme="glass"] .panel::before { display: none; }
+body[data-theme="glass"] .panel h3 { font-size: 15px; }
+body[data-theme="glass"] th { border-bottom: 1px solid rgba(255,255,255,.45); color: #dce4ff; }
+body[data-theme="glass"] td { border-bottom: 1px solid rgba(255,255,255,.12); }
+body[data-theme="glass"] button, body[data-theme="glass"] select, body[data-theme="glass"] input { border: 1px solid rgba(255,255,255,.4); border-radius: 14px; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+body[data-theme="glass"] button:hover:not(:disabled) { color: #fff; }
+body[data-theme="glass"] button.primary { border-color: rgba(255,255,255,.7); }
+body[data-theme="glass"] button.primary:hover:not(:disabled) { background: #fff; color: #141a3d; }
+body[data-theme="glass"] input { background: rgba(255,255,255,.12); color: #f6f8ff; }
+body[data-theme="glass"] select option { background: #1b1f4a; color: #f6f8ff; }
+body[data-theme="glass"] .tabs { border: 1px solid rgba(255,255,255,.38); border-radius: 18px; backdrop-filter: blur(16px); background: rgba(255,255,255,.08); }
+body[data-theme="glass"] .tabs a { border-right: 1px solid rgba(255,255,255,.2); }
+body[data-theme="glass"] .tag { border: 1px solid rgba(255,255,255,.5); border-radius: 12px; }
+body[data-theme="glass"] .tag.gold { background: rgba(255,226,140,.9); color: #1a1500; }
+body[data-theme="glass"] .item { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.3); border-radius: 14px; }
+body[data-theme="glass"] .hero { border-bottom: 1px solid rgba(255,255,255,.3); }
+body[data-theme="glass"] .branded .hero { border-radius: 22px; border: 1px solid rgba(255,255,255,.5); }
+body[data-theme="glass"] .branded .panel { border-top: 5px solid var(--c1); }
+body[data-theme="glass"] tr.tc > td { background: color-mix(in srgb, var(--rc) 16%, transparent); }
+body[data-theme="glass"] a.lk { text-decoration-color: #8fd9ff; }
+body[data-theme="glass"] a.lk:hover { background: rgba(255,255,255,.88); color: #141a3d; }
+body[data-theme="glass"] tr.follow td, body[data-theme="glass"] tr.tc.follow > td { background: rgba(255,226,140,.9); color: #1a1500; }
+
+/* ============================================================ 2060s  Dreamcore */
+/* a pastel sky that is slightly wrong: soft haze, dotted rules, slow italic type, a sun that is too low */
+body[data-theme="dreamcore"] {
+  --bg: #e9e4fb; --panel: rgba(255,251,246,.86); --ink: #2a2350; --muted: #675f93; --line: #cbc2ec; --hover: #f1e8ff;
+  --a1: #ef8fb7; --a2: #ffe29a; --a3: #86b9ee;
+  --rule: 2px; --rulec: #9a8bd8; --radius: 26px; --shadow: 0 0 26px rgba(154,139,216,.35);
+  --font: Georgia, "Palatino Linotype", "Book Antiqua", serif; --hfont: Georgia, "Palatino Linotype", serif; --htr: lowercase; --hls: .12em; --hweight: 400;
+  --btn-bg: #fffbf6; --btn-fg: #2a2350; --btn-hover: #ffe9f3; --prim-bg: linear-gradient(120deg, #ef8fb7, #9bb6ff); --prim-fg: #1d1745;
+  --tab-on-bg: #5c4fb0; --tab-on-fg: #fffbf6; --hdr-bg: rgba(255,251,246,.6); --hdr-fg: #2a2350;
+  --b1: #ef8fb7; --b2: #ffe29a; --b3: #86b9ee; --brad: 50%; --glow: 0 0 12px rgba(239,143,183,.6); --panel-blur: blur(2px);
+  --bg2:
+    radial-gradient(ellipse 42% 16% at 20% 24%, rgba(255,255,255,.85), transparent 70%) fixed,
+    radial-gradient(ellipse 36% 13% at 76% 14%, rgba(255,255,255,.8), transparent 70%) fixed,
+    radial-gradient(ellipse 50% 14% at 60% 62%, rgba(255,255,255,.55), transparent 70%) fixed,
+    radial-gradient(circle at 50% 118%, #ffd6a8 0 14%, #ffb8d4 15% 26%, transparent 27%) fixed,
+    linear-gradient(180deg, #b9d6ff 0%, #e6d9ff 45%, #ffe3ef 80%, #fff0d4 100%) fixed;
+}
+body[data-theme="dreamcore"] header.top { border-bottom: 2px dotted #9a8bd8; }
+body[data-theme="dreamcore"] .brand h1, body[data-theme="dreamcore"] .hero h2 { font-style: italic; font-weight: 400; text-shadow: 0 0 14px rgba(239,143,183,.8), 0 0 2px rgba(255,255,255,.9); }
+body[data-theme="dreamcore"] .block { border-style: dotted; border-radius: 50%; }
+body[data-theme="dreamcore"] .panel { border: 2px dotted #9a8bd8; box-shadow: 0 0 0 6px rgba(255,255,255,.35), var(--shadow); }
+body[data-theme="dreamcore"] .panel::before { width: 22px; height: 22px; left: auto; right: 16px; top: -12px; border: 0; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #fff 0 18%, #ffe29a 19% 55%, #ef8fb7 56%); box-shadow: 0 0 14px rgba(255,226,154,.9); }
+body[data-theme="dreamcore"] .panel h3 { font-style: italic; font-weight: 400; font-size: 17px; }
+body[data-theme="dreamcore"] th { font-style: italic; text-transform: lowercase; letter-spacing: .08em; font-size: 13px; border-bottom: 2px dotted #9a8bd8; }
+body[data-theme="dreamcore"] td { border-bottom: 1px dotted #cbc2ec; }
+body[data-theme="dreamcore"] button, body[data-theme="dreamcore"] select, body[data-theme="dreamcore"] input { border: 2px dotted #9a8bd8; border-radius: 18px; text-transform: lowercase; }
+body[data-theme="dreamcore"] button.primary { border-style: solid; }
+body[data-theme="dreamcore"] .tabs { border: 2px dotted #9a8bd8; border-radius: 22px; background: rgba(255,251,246,.7); }
+body[data-theme="dreamcore"] .tabs a { border-right: 2px dotted #9a8bd8; text-transform: lowercase; }
+body[data-theme="dreamcore"] .tag { border: 1px dotted #5c4fb0; border-radius: 14px; }
+body[data-theme="dreamcore"] .bar, body[data-theme="dreamcore"] .meter > span { background: linear-gradient(90deg, #ef8fb7, #86b9ee); }
+body[data-theme="dreamcore"] .branded .hero { border-radius: 26px; }
+body[data-theme="dreamcore"] .branded .hero h2 { text-shadow: none; }
+body[data-theme="dreamcore"] .feed li.hd, body[data-theme="dreamcore"] tr.follow td, body[data-theme="dreamcore"] tr.tc.follow > td { background: #ffe29a; color: #2a2350; }
+
+/* ============================================================ 2070s  Parametric */
+/* clean and neutral on purpose, so the team colours are the loudest thing on every page: calm grey
+   surfaces, thin lines, a quiet lattice of arcs, and team washes, stripes and chips turned up */
+body[data-theme="parametric"] {
+  --bg: #f3f4f5; --panel: #ffffff; --ink: #1d2024; --muted: #636a72; --line: #e0e3e6; --hover: #eceef0;
+  --a1: #2a2f36; --a2: #aab1b9; --a3: #4a525b;
+  --rule: 1px; --rulec: #cfd3d8; --radius: 10px; --shadow: none;
+  --font: Inter, "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; --hfont: var(--font); --htr: none; --hls: -.01em; --hweight: 600;
+  --btn-bg: #ffffff; --btn-fg: #1d2024; --btn-hover: #e6e9ec; --prim-bg: #1d2024; --prim-fg: #ffffff;
+  --tab-on-bg: #1d2024; --tab-on-fg: #ffffff; --hdr-bg: #ffffff; --hdr-fg: #1d2024;
+  --b1: #2a2f36; --b2: #aab1b9; --b3: #4a525b; --brad: 50%; --glow: none; --panel-blur: none;
+  --bg2:
+    radial-gradient(circle at 0 0, transparent 0 38px, rgba(29,32,36,.055) 39px 40px, transparent 41px) 0 0 / 80px 80px,
+    radial-gradient(circle at 80px 80px, transparent 0 38px, rgba(29,32,36,.055) 39px 40px, transparent 41px) 0 0 / 80px 80px;
+}
+body[data-theme="parametric"] header.top { border-bottom: 1px solid #cfd3d8; }
+body[data-theme="parametric"] .block { border: 0; background: #1d2024; border-radius: 50%; width: 18px; height: 18px; }
+body[data-theme="parametric"] .block.b-yellow { background: #aab1b9; }
+body[data-theme="parametric"] .block.b-blue { background: #4a525b; width: 36px; border-radius: 9px; }
+body[data-theme="parametric"] .panel { border: 1px solid #d9dce0; }
+body[data-theme="parametric"] .panel::before { width: 26px; height: 3px; left: 16px; top: -2px; border: 0; border-radius: 2px; background: #1d2024; }
+body[data-theme="parametric"] .panel h3 { font-size: 15px; font-weight: 600; }
+body[data-theme="parametric"] th { border-bottom: 1px solid #aab1b9; font-weight: 600; color: #4a525b; }
+body[data-theme="parametric"] button, body[data-theme="parametric"] select, body[data-theme="parametric"] input { border: 1px solid #cfd3d8; border-radius: 9px; }
+body[data-theme="parametric"] button.primary { border-color: #1d2024; }
+body[data-theme="parametric"] .tabs { border: 1px solid #cfd3d8; border-radius: 12px; background: #fff; }
+body[data-theme="parametric"] .tabs a { border-right: 1px solid #e0e3e6; }
+body[data-theme="parametric"] .tag { border: 1px solid #aab1b9; border-radius: 8px; }
+body[data-theme="parametric"] .tag.gold { background: #1d2024; color: #ffffff; border-color: #1d2024; }
+body[data-theme="parametric"] a.lk { text-decoration-color: #aab1b9; }
+body[data-theme="parametric"] .meter > span, body[data-theme="parametric"] .bar { background: #4a525b; }
+/* team colour is the point: rows, chips and the page hero carry it at full strength */
+body[data-theme="parametric"] tr.tc > td { background: color-mix(in srgb, var(--rc) 24%, #ffffff); }
+body[data-theme="parametric"] tr.tc > td:first-child { box-shadow: inset 9px 0 0 var(--rc), inset 11px 0 0 #ffffff; padding-left: 16px; }
+body[data-theme="parametric"] tr.tc:hover > td { background: color-mix(in srgb, var(--rc) 36%, #ffffff); }
+body[data-theme="parametric"] tr.tc.out > td { background: color-mix(in srgb, var(--rc) 10%, #ffffff); }
+body[data-theme="parametric"] tr.tc.follow > td { background: color-mix(in srgb, var(--rc) 55%, #ffffff); color: var(--ink); }
+body[data-theme="parametric"] .sw { width: 20px; height: 20px; border-radius: 6px; vertical-align: -5px; box-shadow: 0 0 0 1px rgba(0,0,0,.25); }
+body[data-theme="parametric"] .mono { box-shadow: inset 0 -4px 0 var(--c2), 0 0 0 1px rgba(0,0,0,.25); }
+body[data-theme="parametric"] .branded .hero { border-bottom: 12px solid var(--c2); border-radius: 12px; padding: 20px 24px 16px; }
+body[data-theme="parametric"] .branded .hero::after { width: 22px; }
+body[data-theme="parametric"] .branded .panel { border-top: 8px solid var(--c1); }
+body[data-theme="parametric"] .branded .panel::before { background: var(--c2); height: 5px; width: 40px; }
+body[data-theme="parametric"] .feed li.hd { background: #1d2024; color: #ffffff; }
+body[data-theme="parametric"] tr.follow td { background: #e6e9ec; }

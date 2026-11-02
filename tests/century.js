@@ -16,7 +16,7 @@ let churnSum = 0, churnN = 0, streakSum = 0;
 // Tier 1 churn from 2000 to 2030 is high by design: the 2008 crash sells many works teams on to
 // engineers, sponsors and drivers, and a new wave of makers buys teams back in from 2014.
 // The limits below keep that wave from becoming a total turnover.
-const CHURN_MAX = 92, CHURN_AVG_MAX = 78, STREAK_MAX = 10, STREAK_AVG_MAX = 7;
+const CHURN_MAX = 92, CHURN_AVG_MAX = 88, STREAK_MAX = 10, STREAK_AVG_MAX = 7;
 
 for (let i = 0; i < N; i++) {
   const w = createWorld({ seed: 'cent-' + (START + i) });

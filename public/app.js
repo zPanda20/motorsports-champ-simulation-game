@@ -36,12 +36,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // ---------------------------------------------------------------- themes (the interface follows the era)
 
 const THEMES = [
-  { id: 'destijl', label: '1919 De Stijl' }, { id: 'bauhaus', label: '1925 Bauhaus' }, { id: 'constructivism', label: '1935 Constructivism' },
+  { id: 'destijl', label: '1919 De Stijl' }, { id: 'bauhaus', label: '1925 Bauhaus' }, { id: 'constructivism', label: '1935 Constructivism (kinetic type)' },
   { id: 'austerity', label: '1940s Austerity print' }, { id: 'atomic', label: '1950s Atomic age' }, { id: 'pop', label: '1960s Pop and Op' },
-  { id: 'swiss', label: '1970s Swiss' }, { id: 'pc98', label: '1980s PC-98' }, { id: 'vaporwave', label: '1990s Vaporwave' },
+  { id: 'swiss', label: '1970s Swiss' }, { id: 'pc98', label: '1980s PC-98' }, { id: 'synthwave', label: '1988-92 Synthwave' }, { id: 'vaporwave', label: '1990s Vaporwave' },
   { id: 'y2k', label: '2000s Y2K' }, { id: 'memphis', label: '2010 Memphis' }, { id: 'duotone', label: '2015 Duotone' },
   { id: 'tech', label: '2020s Abstract tech' }, { id: 'acid', label: '2030s Acid' },
+  { id: 'holo', label: '2040s Holographic' }, { id: 'glass', label: '2050s Glassmorphism' }, { id: 'dreamcore', label: '2060s Dreamcore' }, { id: 'parametric', label: '2070s Parametric' },
+  { id: 'brutal', label: 'Digital Brutalism (the main menu)' },
 ];
+// the choice that turns the era interfaces off
+const NO_ERA = { id: 'neumorphic', label: 'Neumorphism (era styles off)' };
 
 function themeForYear(y) {
   if (y < 1925) return 'destijl';
@@ -51,31 +55,57 @@ function themeForYear(y) {
   if (y < 1960) return 'atomic';
   if (y < 1970) return 'pop';
   if (y < 1980) return 'swiss';
-  if (y < 1990) return 'pc98';
+  if (y < 1988) return 'pc98';
+  if (y < 1993) return 'synthwave';
   if (y < 2000) return 'vaporwave';
   if (y < 2010) return 'y2k';
   if (y < 2015) return 'memphis';
   if (y < 2020) return 'duotone';
   if (y < 2030) return 'tech';
-  return 'acid';
+  if (y < 2040) return 'acid';
+  if (y < 2050) return 'holo';
+  if (y < 2060) return 'glass';
+  if (y < 2070) return 'dreamcore';
+  return 'parametric';
 }
+
+// the main menu is always Digital Brutalism, whatever era the series is in
+const onMenu = () => !world || !$('welcome').hidden;
 
 function applyTheme() {
   const pref = store.get('msc.theme') || 'auto';
-  const id = pref === 'auto' ? themeForYear(world ? world.year : 1919) : pref;
+  const year = world ? world.year : 1919;
+  const id = onMenu() ? 'brutal' : pref === 'auto' ? themeForYear(year) : pref;
   document.body.dataset.theme = id;
-  const bg = (store.get('msc.bg') || 'on') === 'on' && world ? backgroundFor(world.year) : null;
+  if (id === 'synthwave') document.body.dataset.phase = year < 1990 ? 'a' : year < 1991 ? 'b' : 'c'; else delete document.body.dataset.phase;
+  // the era pictures belong to the era interfaces: not on the menu and not with the neumorphic option
+  const bg = (store.get('msc.bg') || 'on') === 'on' && world && !onMenu() && id !== 'neumorphic' ? backgroundFor(world.year) : null;
   if (bg) document.body.dataset.bg = bg; else delete document.body.dataset.bg;
+  kinetic();
+}
+
+// Constructivism: headings are split into words and letters so the stylesheet can throw them in
+function kinetic() {
+  if (document.body.dataset.theme !== 'constructivism') return;
+  for (const h of document.querySelectorAll('header.top h1, #view h2, #view h3')) {
+    if (h.dataset.kin || h.children.length || !h.textContent.trim()) continue;
+    const txt = h.textContent;
+    h.dataset.kin = '1'; h.classList.add('kin'); h.setAttribute('aria-label', txt);
+    let i = 0;
+    h.innerHTML = txt.split(/\s+/).filter(Boolean).map((word) => '<span class="w" aria-hidden="true">' + [...word].map((c) => `<span style="--i:${i++}">${esc(c)}</span>`).join('') + '</span>').join(' ');
+  }
 }
 
 function initThemePicker() {
   const sel = $('theme-sel');
-  sel.innerHTML = '<option value="auto">Interface follows the era</option>' + THEMES.map((t) => `<option value="${t.id}">Fixed: ${esc(t.label)}</option>`).join('');
+  sel.innerHTML = '<option value="auto">Interface follows the era</option><option value="' + NO_ERA.id + '">' + esc(NO_ERA.label) + '</option>' + THEMES.map((t) => `<option value="${t.id}">Fixed: ${esc(t.label)}</option>`).join('');
   sel.value = store.get('msc.theme') || 'auto';
   sel.onchange = () => { store.set('msc.theme', sel.value); applyTheme(); };
   const bsel = $('bg-sel');
   bsel.value = store.get('msc.bg') || 'on';
   bsel.onchange = () => { store.set('msc.bg', bsel.value); applyTheme(); };
+  // the menu and the game swap by hiding the menu: restyle whenever that changes
+  new MutationObserver(() => applyTheme()).observe($('welcome'), { attributes: true, attributeFilter: ['hidden'] });
 }
 
 // ---------------------------------------------------------------- automatic copy (IndexedDB, falling back to localStorage)
@@ -165,7 +195,7 @@ function loadFile(file) {
 
 // ---------------------------------------------------------------- the router
 
-const TAB_OF = { race: 'race', standings: 'standings', teams: 'teams', team: 'teams', lowteam: 'tiers', drivers: 'drivers', driver: 'drivers', tiers: 'tiers', series: 'tiers', industry: 'industry', brand: 'industry', sponsor: 'industry', group: 'industry', groups: 'industry', oil: 'industry', tyre: 'industry', inbox: 'inbox', rules: 'rules', chronicle: 'chronicle', records: 'records', track: 'records' };
+const TAB_OF = { race: 'race', standings: 'standings', teams: 'teams', team: 'teams', lowteam: 'tiers', drivers: 'drivers', driver: 'drivers', person: 'drivers', tiers: 'tiers', series: 'tiers', industry: 'industry', brand: 'industry', sponsor: 'industry', group: 'industry', groups: 'industry', oil: 'industry', tyre: 'industry', inbox: 'inbox', rules: 'rules', chronicle: 'chronicle', records: 'records', track: 'records' };
 
 function parseRoute() {
   const parts = (location.hash || '#/race').replace(/^#\/?/, '').split('/');
@@ -181,6 +211,7 @@ function viewFor(name, arg, sub, extra) {
     case 'lowteam': return pages.pageLowTeam(world, num(arg));
     case 'drivers': return pages.pageDrivers(world);
     case 'driver': return pages.pageDriver(world, num(arg));
+    case 'person': return pages.pagePerson(world, arg);
     case 'tiers': return pages.pageTiers(world);
     case 'series': return pages.pageSeries(world, num(arg), sub, sub === 'chronicle' ? extra : null);
     case 'industry': return pages.pageIndustry(world, world.governor.mode === 'hands' || (world.governor.manual && world.governor.manual['entry-works']));
@@ -208,12 +239,13 @@ function renderRoute(keepScroll) {
   const race = tab === 'race';
   $('tab-race').hidden = !race;
   $('view').hidden = race;
-  if (race) { renderRaceTab(); return; }
+  if (race) { renderRaceTab(); kinetic(); return; }
   const y = window.scrollY;
   let html;
   try { html = viewFor(name, arg, sub, extra); } catch (e) { html = `<section class="panel"><h3>This page could not be drawn</h3><div class="small">${esc(e.message)}</div></section>`; console.error(e); }
   $('view').innerHTML = (name === 'team' || name === 'driver' || name === 'series' || name === 'brand' || name === 'sponsor' || name === 'lowteam' || name === 'track' || name === 'group' || name === 'oil' || name === 'tyre' || (name === 'standings' && arg !== null) ? '<div class="back"><a class="lk" href="javascript:history.back()">&larr; Back</a></div>' : '') + html;
   if (keepScroll) window.scrollTo(0, y); else window.scrollTo(0, 0);
+  kinetic();
 }
 
 window.addEventListener('hashchange', () => { if (world) renderRoute(false); });
@@ -342,6 +374,63 @@ function renderTiming(step, info) {
 
 const NOTABLE = new Set(['out', 'repair', 'limp', 'damage', 'pit', 'safety']);
 
+// ---- qualifying and pre-qualifying, watched car by car ----
+// A flying lap as m:ss.t (whole seconds in the first years, when the stopwatch was a hand-held one)
+function lapText(sec, year) {
+  if (sec === null || sec === undefined) return '';
+  const hand = year < 1935;
+  const t = hand ? Math.round(sec) : Math.round(sec * 10) / 10;
+  const m = Math.floor(t / 60);
+  const s = t - m * 60;
+  return `${m}:${hand ? String(Math.round(s)).padStart(2, '0') : s.toFixed(1).padStart(4, '0')}`;
+}
+
+function renderSession(title, done, roster, cut, total, lastId, year) {
+  const look = (id) => { const g = roster[id] || {}; if (g.teamId === undefined) return { badge: '', style: '' }; const pal = teamPalette(world, g.teamId); return { badge: teamBadge(world, g.teamId), style: `--rc:${pal[0]};--rc2:${pal[1]}` }; };
+  const best = done.length ? done[0].time : 0;
+  const rows = done.map((r, i) => {
+    const g = roster[r.entryId] || {};
+    const team = (teamById(world, g.teamId) || { name: '?' }).name;
+    const out = cut !== null && i >= cut;
+    return `<tr class="tc ${out ? 'out ' : ''}${g.driverId === followDriver ? 'follow ' : ''}${r.entryId === lastId ? 'fresh' : ''}" style="${look(r.entryId).style}"><td>${i + 1}</td><td>${g.number === undefined ? '' : g.number}</td><td>${esc(g.driverName || '?')}</td><td>${look(r.entryId).badge}${esc(team)}</td><td class="num">${lapText(r.time, year)}</td><td class="num">${i === 0 ? '' : gapText(r.time - best, year)}</td></tr>`;
+  });
+  $('timing').innerHTML = '<thead><tr><th>P</th><th>No.</th><th>Driver</th><th>Team</th><th class="num">Time</th><th class="num">Gap</th></tr></thead><tbody>' + rows.join('') + '</tbody>';
+  $('lapcount').textContent = `${title}: ${done.length} of ${total} cars have set a time` + (cut !== null && done.length ? ` · the top ${cut} go through` : '');
+}
+
+// rows: [{entryId, time}] in finishing order. Cars run in an order of their own and the sheet re-sorts as times come in.
+async function watchSession(title, rows, roster, cut, mode, my, round) {
+  const year = world.year;
+  const runOrder = rows.slice().sort((a, b) => ((a.entryId * 7919 + round * 104729) % 1009) - ((b.entryId * 7919 + round * 104729) % 1009));
+  const done = [];
+  const total = rows.length;
+  let top = null;
+  const chunk = mode === 3 ? Math.max(1, Math.ceil(total / 3)) : 1;
+  const delay = mode === 1 ? 260 : mode === 2 ? 50 : 350;
+  feed(`${title} begins: ${total} cars.`, 'hd');
+  for (let i = 0; i < runOrder.length; i += chunk) {
+    if (my !== token) return false;
+    let last = null;
+    for (const r of runOrder.slice(i, i + chunk)) {
+      done.push(r); last = r.entryId;
+      done.sort((a, b) => a.time - b.time || a.entryId - b.entryId);
+      if (done[0].entryId !== top && done.length > 1) {
+        top = done[0].entryId;
+        const g = roster[top] || {};
+        if (mode !== 3 || i + chunk >= runOrder.length) feed(`${title}: #${g.number} ${g.driverName} goes fastest with ${lapText(done[0].time, year)}.`);
+      } else if (done.length === 1) top = done[0].entryId;
+    }
+    renderSession(title, done, roster, cut, total, last, year);
+    await sleep(delay);
+    while (paused && my === token && !abort) await sleep(100);
+    if (abort) return true;
+  }
+  const g = roster[done[0].entryId] || {};
+  feed(`${title} ends: #${g.number} ${g.driverName} is quickest in ${lapText(done[0].time, year)}.`, 'hd');
+  await sleep(mode === 2 ? 250 : 700);
+  return true;
+}
+
 async function watch(mode) {
   if (busy || world.season.done || world.phase === 'offseason') return;
   const my = token;
@@ -351,6 +440,24 @@ async function watch(mode) {
   const info = {};
   const tname = (id) => (teamById(world, id) || { name: '?' }).name;
   for (const st of prep.setup.starters) info[st.entryId] = { number: st.number, driverName: st.driverName, driverId: st.driverId, team: tname(st.teamId), teamId: st.teamId };
+  // the sessions before the race, if asked for
+  const sessions = $('sessions').value;
+  if (sessions !== 'race') {
+    const grid = new Set(prep.setup.starters.map((s) => s.entryId));
+    if (sessions === 'all' && prep.prequal.tried.length) {
+      const cutAt = prep.prequal.slots;
+      const ok = await watchSession('Pre-qualifying', prep.prequal.tried.map((r) => ({ entryId: r.entryId, time: r.time })), prep.roster, world.regs.preQual === false ? null : cutAt, mode, my, prep.setup.round);
+      if (!ok) return;
+    }
+    const q = prep.qualifying.map((r) => ({ entryId: r.entryId, time: r.time }));
+    if (q.length) {
+      const cutAt = q.length > grid.size ? grid.size : null;
+      const ok = await watchSession('Qualifying', q, prep.roster, cutAt, mode, my, prep.setup.round);
+      if (!ok) return;
+    }
+    if (abort) { busy = false; abort = false; runMode = ''; setButtons(); return; }
+    clearRaceView();
+  }
   const gen = raceGenerator(prep.setup);
   const delay = mode === 1 ? 380 : mode === 2 ? 70 : 0;
   let result = null;
@@ -517,6 +624,9 @@ async function init() {
     if (n !== null) { store.set('msc.device', n.trim()); if (world) renderAll(); }
   };
   $('follow').onchange = (e) => { followDriver = +e.target.value; };
+  const sess = store.get('msc.sessions');
+  if (sess === 'race' || sess === 'quali' || sess === 'all') $('sessions').value = sess;
+  $('sessions').onchange = (e) => store.set('msc.sessions', e.target.value);
   $('btn-watch1').onclick = () => watch(1);
   $('btn-watch2').onclick = () => watch(2);
   $('btn-watch3').onclick = () => watch(3);

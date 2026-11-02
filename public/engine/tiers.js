@@ -39,10 +39,10 @@ export function scoutEstimate(world, d, year) {
 
 // ---------------------------------------------------------------- series and teams
 
-function lowTeamName(world, rng, nat) {
+function lowTeamName(world, rng, nat, year) {
   const names = new Set(world.teams.map((t) => t.name));
   for (const t of world.lowTeams) names.add(t.name);
-  return makeTeamName(rng, nat, names);
+  return makeTeamName(rng, nat, names, year);
 }
 
 function pickNat(region, year, rng) {
@@ -54,7 +54,7 @@ export function addLowTeam(world, rng, region, year, tier, strengthMean) {
   const nat = pickNat(region, year, rng);
   const strength = clamp(rng.gauss(strengthMean, 0.11), 0.12, 0.85);
   const t = {
-    id: ++world.counters.lowTeam, name: lowTeamName(world, rng, nat), nat, region,
+    id: ++world.counters.lowTeam, name: lowTeamName(world, rng, nat, year), nat, region,
     strength: MINI(strength), wealth: MINI(clamp(rng.gauss(0.25 + tier * 0.02, 0.1), 0.05, 0.8)),
     founded: year, ended: null, brandId: null, prestige: 5, titles: 0, wins: 0, groupTeamId: null,
   };

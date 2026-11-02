@@ -75,7 +75,7 @@ export function legendRoster() {
     if (rng.chance(0.5)) n++;
     if (rng.chance(0.18)) n++;
     for (let i = 0; i < n; i++) {
-      const natW = nationalityWeights(by + 24);
+      const natW = nationalityWeights(by + 24, true);
       const nat = rng.weighted(natW, (x) => x.w).n;
       const gender = list.length % 2 === 0 ? 'M' : 'F';
       const nm = makePersonName(rng, nat, used, gender);
@@ -109,7 +109,7 @@ export function makeDriverFromLegend(rng, id, leg) {
 }
 
 export function makeDriver(rng, id, nat, birthYear, used, gender = 'M') {
-  const nm = makePersonName(rng, nat, used, gender);
+  const nm = makePersonName(rng, nat, used, gender, birthYear);
   const talent = clamp(rng.gauss(50, 11), 20, 82);
   const peak = {};
   for (const k of STAT_KEYS) peak[k] = clamp(Math.round(talent + rng.gauss(0, 9)), 10, 97);

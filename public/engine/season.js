@@ -142,9 +142,14 @@ export function prepareRound(world) {
       if (rd) { used.add(rd.id); st.relief = { driverId: rd.id, driverName: rd.name, stats: statsAt(rd, year) }; }
     }
   }
-  void cutQual;
+  // who ran in which session, for the viewer (not stored in the season)
+  const roster = {};
+  for (const e of exempt.concat(trying)) {
+    const st = starterFor(world, e, year);
+    roster[e.id] = { number: st.number, driverName: st.driverName, driverId: st.driverId, teamId: st.teamId };
+  }
   return {
-    setup,
+    setup, roster, cutQual,
     endurance,
     prequal: { exempt: exempt.map((e) => e.id), tried: pre.map((r) => ({ entryId: r.entryId, time: Math.round(r.time * 10) / 10, through: through.indexOf(r.entryId) >= 0 })), failed, slots },
     qualifying: qual.map((q, i) => ({ pos: i + 1, entryId: q.st.entryId, time: Math.round(q.time * 10) / 10 })),

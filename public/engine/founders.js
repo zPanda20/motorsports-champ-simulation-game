@@ -18,6 +18,7 @@ import {
   activeTeams, makeStaff,
 } from './world.js';
 import { worksTeamName } from './corp.js';
+import { retireIdentity } from './identity.js';
 
 const r2 = (x) => Math.round(x * 100) / 100;
 
@@ -176,14 +177,14 @@ export function applyFounderDecision(world, pl, choice, year, rng) {
     const e = pl.engineer;
     const used = usedNames(world);
     // the engineer leaves; the old team promotes someone
-    from.staff.techDirector = makeStaff(rng.fork('replace'), from.nat, used, from.wealth).techDirector;
+    from.staff.techDirector = makeStaff(rng.fork('replace'), from.nat, used, from.wealth, year).techDirector;
     from.staff.techDirector.age = rng.fork('ra').int(30, 44);
     const wealth = r2(clamp(0.3 + (e.rating - 70) * 0.006, 0.28, 0.5));
     const person = { name: e.name, nat: e.nat, gender: e.gender };
     const t = addPrivateerTeam(world, rng, year, {
       name: pl.name, nat: e.nat, wealth, brandId: brand.id, builder: true, twoCars: true,
       partner: { brandId: brand.id, preferred: true, since: year, until: year + rng.fork('len').int(3, 7) },
-      origin: { type: 'engineer-founder', year, by: e.name, from: from.name, rating: e.rating },
+      origin: { type: 'engineer-founder', year, by: e.name, from: from.name, fromTeamId: from.id, rating: e.rating },
       owner: newOwnerFor(world, person, e.nat, { wealth }, 'engineer and founder', year, rng.fork('owner')),
       staff: { techDirector: { name: e.name, nat: e.nat, gender: e.gender, rating: Math.min(95, e.rating + 2), age: e.age, founded: true } },
       prestige: 18 + Math.max(0, e.rating - 70), fans: 8,
@@ -277,11 +278,12 @@ export function sellOffWorks(world, team, oldBrand, year, rng) {
     how = 'a consortium of investors';
   }
   if (!name) {
-    const surname = makePersonName(rng.fork('sn'), team.nat, used, 'M').full.split(' ').slice(1).join(' ');
+    const surname = makePersonName(rng.fork('sn'), team.nat, used, 'M', year - 40).full.split(' ').slice(1).join(' ');
     name = rng.fork('n2').pick([`${surname} Racing`, `${surname} Grand Prix`, `Team ${surname}`]);
     if (taken.has(name)) name = `${surname} Motor Racing`;
   }
   team.colors = brandColors(oldBrand.id).slice();
+  retireIdentity(world, team, year, 'sold by its maker', name);
   team.kind = 'privateer';
   team.name = name;
   team.names = team.names || [old];
@@ -309,11 +311,13 @@ export function candidatesToBuy(world, year) {
 
 export function acquireTeam(world, brand, team, year, rng) {
   const old = team.name;
+  const newName = worksTeamName(world, brand, year, rng.fork('name'));
+  retireIdentity(world, team, year, 'bought by a maker', newName);
   team.kind = 'works';
   team.brandId = brand.id;
   team.partner = null; team.constructorTeam = false; team.builder = false;
   team.nat = brand.country; team.region = regionOf(brand.country);
-  team.name = worksTeamName(world, brand, year, rng.fork('name'));
+  team.name = newName;
   team.names = team.names || [old];
   if (team.names.indexOf(team.name) < 0) team.names.push(team.name);
   const prevOwner = team.owner ? team.owner.name : '';

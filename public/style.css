@@ -268,6 +268,10 @@ body[data-bg]::before { opacity: 1; }
 body[data-bg="1920s"]::before { background-image: linear-gradient(rgba(241,234,216,.28), rgba(241,234,216,.28)), url(assets/bg/1920s.jpg); }
 body[data-bg="1930s"]::before { background-image: linear-gradient(rgba(240,240,240,.30), rgba(240,240,240,.30)), url(assets/bg/1930s.jpg); }
 body[data-bg="1940s"]::before { background-image: linear-gradient(rgba(240,230,210,.22), rgba(240,230,210,.22)), url(assets/bg/1940s.jpg); }
+body[data-bg="1960s"]::before { background-image: linear-gradient(rgba(255,252,244,.26), rgba(255,252,244,.26)), url(assets/bg/1960s.jpg); }
+body[data-bg="1970s"]::before { background-image: linear-gradient(rgba(248,244,236,.28), rgba(248,244,236,.28)), url(assets/bg/1970s.jpg); }
+body[data-bg="1980s"]::before { background-image: linear-gradient(rgba(240,240,250,.26), rgba(240,240,250,.26)), url(assets/bg/1980s.jpg); }
+body[data-bg="1990s"]::before { background-image: linear-gradient(rgba(248,240,250,.26), rgba(248,240,250,.26)), url(assets/bg/1990s.jpg); }
 body[data-bg="1950s"]::before { background-image: linear-gradient(rgba(255,250,240,.18), rgba(255,250,240,.18)), url(assets/bg/1950s.jpg); }
 body[data-bg] { background-color: var(--bg); background-image: none; }
 /* text that sits directly on the picture rather than in a panel stays readable */

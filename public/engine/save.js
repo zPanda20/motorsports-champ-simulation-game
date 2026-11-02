@@ -3,6 +3,7 @@
 // the state, so nothing about random streams needs saving.
 
 import { makeRng } from './rng.js';
+import { rebuildIdentities } from './identity.js';
 import { SAVE_VERSION, ensureCohorts, activeEntries, teamById, driverById, ensureOils, assignOil } from './world.js';
 import { initCorp } from './corp.js';
 import { defaultRegs, eraFor, scoringFor } from './data/eras.js';
@@ -90,6 +91,11 @@ export function migrate(world) {
     assignOil(world, makeRng(world.seed, 'mig-oil', year), year);
     supplierDeals(world, year);
     for (const t of world.teams) { if (!t.origin) t.origin = { type: t.kind === 'works' ? 'manufacturer' : 'investors', year: t.foundedYear }; if (t.oilId === undefined) t.oilId = t.oilId || null; }
+  }
+  if (world.version < 5) {
+    // team identities: a best-effort rebuild from the chronicle and the season records
+    for (const t of world.teams) if (!t.history) t.history = [];
+    rebuildIdentities(world);
   }
   world.version = SAVE_VERSION;
   return world;
